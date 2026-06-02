@@ -3,420 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NAME</title>
+<title>WERIS — Contract Intelligence</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --bg:        #f4f3ef;
-    --surface:   #ffffff;
-    --surface2:  #f9f8f5;
-    --border:    #e2e0d8;
-    --border2:   #cccac0;
-    --text:      #1a1916;
-    --text2:     #6b6960;
-    --text3:     #9e9c94;
-    --blue:      #1a56db;
-    --blue-bg:   #eff4ff;
-    --blue-bd:   #c3d5f8;
-    --green:     #057a55;
-    --green-bg:  #ecfdf3;
-    --green-bd:  #a3e0be;
-    --amber:     #92400e;
-    --amber-bg:  #fffbeb;
-    --amber-bd:  #fcd34d;
-    --red:       #9b1c1c;
-    --red-bg:    #fef2f2;
-    --red-bd:    #fca5a5;
-    --gray-bg:   #f3f4f6;
-    --gray-bd:   #d1d5db;
-    --radius:    8px;
-    --radius-lg: 12px;
-    --shadow:    0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
-    --mono:      'IBM Plex Mono', monospace;
-    --sans:      'IBM Plex Sans', system-ui, sans-serif;
-  }
-
-  body {
-    font-family: var(--sans);
-    background: var(--bg);
-    color: var(--text);
-    font-size: 14px;
-    line-height: 1.6;
-    min-height: 100vh;
-  }
-
-  .app {
-    display: grid;
-    grid-template-rows: 56px 1fr;
-    grid-template-columns: 290px 1fr;
-    grid-template-areas:
-      "header header"
-      "sidebar main";
-    min-height: 100vh;
-  }
-
-  header {
-    grid-area: header;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 1.5rem;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    box-shadow: var(--shadow);
-  }
-
-  .logo {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-weight: 600;
-    font-size: 15px;
-    letter-spacing: -.01em;
-  }
-
-  .logo-icon {
-    width: 30px; height: 30px;
-    background: var(--text);
-    border-radius: 7px;
-    display: flex; align-items: center; justify-content: center;
-    color: #fff;
-    font-size: 15px;
-  }
-
-  .logo-badge {
-    font-size: 10px;
-    font-weight: 500;
-    background: var(--blue-bg);
-    color: var(--blue);
-    border: 1px solid var(--blue-bd);
-    border-radius: 20px;
-    padding: 1px 8px;
-    letter-spacing: .02em;
-  }
-
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .proxy-status {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    color: var(--text2);
-  }
-
-  .status-dot {
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: var(--gray-bd);
-    transition: background .3s;
-  }
-
-  .status-dot.ok    { background: var(--green); }
-  .status-dot.error { background: #ef4444; }
-
-  .proxy-url-input {
-    font-family: var(--mono);
-    font-size: 11px;
-    padding: 4px 8px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface2);
-    color: var(--text);
-    width: 210px;
-  }
-
-  .proxy-url-input:focus { outline: 2px solid var(--blue); outline-offset: 1px; }
-
-  .check-btn {
-    font-size: 12px;
-    padding: 5px 12px;
-    border: 1px solid var(--border2);
-    border-radius: var(--radius);
-    background: var(--surface);
-    color: var(--text2);
-    cursor: pointer;
-    transition: all .15s;
-  }
-
-  .check-btn:hover { background: var(--surface2); color: var(--text); }
-
-  aside {
-    grid-area: sidebar;
-    background: var(--surface);
-    border-right: 1px solid var(--border);
-    padding: 1.25rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1.125rem;
-    position: sticky;
-    top: 56px;
-    height: calc(100vh - 56px);
-    overflow-y: auto;
-  }
-
-  .section-label {
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    color: var(--text3);
-    margin-bottom: 6px;
-  }
-
-  .divider { height: 1px; background: var(--border); }
-
-  .source-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-
-  .chip {
-    font-size: 12px;
-    padding: 4px 11px;
-    border-radius: 20px;
-    border: 1px solid var(--border);
-    cursor: pointer;
-    background: var(--surface);
-    color: var(--text2);
-    transition: all .15s;
-    display: flex; align-items: center; gap: 5px;
-  }
-
-  .chip:hover:not(.disabled) { border-color: var(--border2); color: var(--text); }
-  .chip.active   { background: var(--text); color: #fff; border-color: var(--text); }
-  .chip.disabled { opacity: .4; cursor: not-allowed; }
-
-  .field { display: flex; flex-direction: column; gap: 5px; }
-  .field label { font-size: 12px; font-weight: 500; color: var(--text2); }
-
-  .field select,
-  .field input[type="date"],
-  .field input[type="text"] {
-    font-family: var(--sans);
-    font-size: 13px;
-    padding: 6px 9px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
-    color: var(--text);
-    width: 100%;
-    transition: border-color .15s;
-  }
-
-  .field select:focus,
-  .field input:focus { outline: 2px solid var(--blue); outline-offset: 1px; border-color: transparent; }
-
-  .naics-grid { display: flex; flex-direction: column; gap: 4px; }
-
-  .naics-tag {
-    font-size: 12px;
-    padding: 5px 9px;
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
-    cursor: pointer;
-    background: var(--surface2);
-    color: var(--text2);
-    transition: all .15s;
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 8px;
-  }
-
-  .naics-tag:hover { border-color: var(--border2); color: var(--text); }
-  .naics-tag.selected { background: var(--blue-bg); color: var(--blue); border-color: var(--blue-bd); }
-  .naics-code { font-family: var(--mono); font-size: 10px; opacity: .7; flex-shrink: 0; }
-
-  .naics-group-label {
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: .06em;
-    text-transform: uppercase;
-    color: var(--text3);
-    margin-top: 6px;
-    margin-bottom: 2px;
-    padding-left: 2px;
-  }
-
-  .run-btn {
-    font-family: var(--sans);
-    font-size: 13px;
-    font-weight: 500;
-    padding: 9px 14px;
-    border-radius: var(--radius);
-    border: none;
-    background: var(--text);
-    color: #fff;
-    cursor: pointer;
-    width: 100%;
-    display: flex; align-items: center; justify-content: center; gap: 7px;
-    transition: opacity .15s;
-  }
-
-  .run-btn:hover { opacity: .85; }
-  .run-btn:disabled { opacity: .4; cursor: not-allowed; }
-
-  main {
-    grid-area: main;
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    min-width: 0;
-  }
-
-  .results-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .results-count { font-size: 13px; color: var(--text2); }
-  .results-count strong { color: var(--text); font-weight: 600; }
-
-  .cards { display: flex; flex-direction: column; gap: .75rem; }
-
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 1rem 1.25rem;
-    transition: border-color .15s, box-shadow .15s;
-  }
-
-  .card:hover { border-color: var(--border2); box-shadow: var(--shadow); }
-
-  .card-top {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 10px;
-  }
-
-  .card-title {
-    font-size: 14px;
-    font-weight: 500;
-    line-height: 1.4;
-    flex: 1;
-    min-width: 0;
-  }
-
-  .type-badge {
-    font-size: 10px;
-    font-weight: 500;
-    padding: 3px 9px;
-    border-radius: 20px;
-    white-space: nowrap;
-    flex-shrink: 0;
-    letter-spacing: .02em;
-  }
-
-  .badge-o, .badge-k { background: var(--blue-bg);  color: var(--blue);  border: 1px solid var(--blue-bd);  }
-  .badge-a           { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-bd); }
-  .badge-p           { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-bd); }
-  .badge-r, .badge-s { background: var(--gray-bg);  color: #374151;      border: 1px solid var(--gray-bd);  }
-
-  .card-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px 18px;
-    font-size: 12px;
-    color: var(--text2);
-  }
-
-  .meta-item { display: flex; align-items: center; gap: 5px; }
-  .meta-item i { font-size: 13px; color: var(--text3); }
-
-  .deadline-warn { color: #d97706 !important; font-weight: 500; }
-  .deadline-warn i { color: #d97706 !important; }
-
-  .source-pill {
-    font-size: 10px;
-    font-family: var(--mono);
-    padding: 1px 7px;
-    border-radius: 4px;
-    background: var(--surface2);
-    color: var(--text3);
-    border: 1px solid var(--border);
-  }
-
-  .pagination {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    margin-top: .5rem;
-    flex-wrap: wrap;
-  }
-
-  .page-btn {
-    font-family: var(--sans);
-    font-size: 12px;
-    padding: 5px 14px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
-    color: var(--text2);
-    cursor: pointer;
-    transition: all .15s;
-  }
-
-  .page-btn:hover:not(:disabled) { background: var(--surface2); color: var(--text); border-color: var(--border2); }
-  .page-btn:disabled { opacity: .35; cursor: not-allowed; }
-  .page-info { font-size: 12px; color: var(--text2); padding: 0 4px; }
-
-  .state-panel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 3.5rem 2rem;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: .625rem;
-    color: var(--text3);
-    text-align: center;
-  }
-
-  .state-panel i { font-size: 40px; margin-bottom: 4px; }
-  .state-panel p { font-size: 14px; color: var(--text2); }
-  .state-panel small { font-size: 12px; }
-
-  .error-panel {
-    background: var(--red-bg);
-    border: 1px solid var(--red-bd);
-    border-radius: var(--radius-lg);
-    padding: 1rem 1.25rem;
-    font-size: 13px;
-    color: var(--red);
-    line-height: 1.6;
-  }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .spinner {
-    display: inline-block;
-    width: 16px; height: 16px;
-    border: 2px solid var(--border);
-    border-top-color: var(--blue);
-    border-radius: 50%;
-    animation: spin .65s linear infinite;
-    flex-shrink: 0;
-  }
-
-  aside::-webkit-scrollbar { width: 4px; }
-  aside::-webkit-scrollbar-track { background: transparent; }
-  aside::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
-</style>
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
@@ -425,8 +16,10 @@
   <!-- Header -->
   <header>
     <div class="logo">
-      <div class="logo-icon"><i class="ti ti-building-bank" aria-hidden="true"></i></div>
-      NAME
+      <img src="img/Weris_Logo_Dark_Background.png" alt="Weris logo">
+      <div class="logo-divider"></div>
+      <span class="logo-app-name">Contract Aggregator Tool</span>
+      <span class="logo-badge">BETA</span>
     </div>
     <div class="header-right">
       <div class="proxy-status">
@@ -451,8 +44,8 @@
         <span class="chip active" id="chip-sam">
           <i class="ti ti-building-community" aria-hidden="true" style="font-size:13px"></i> SAM.gov
         </span>
-        <span class="chip disabled" title="Coming soon — acquistiongateway adapter">
-          <i class="ti ti-clock" aria-hidden="true" style="font-size:13px"></i> acquistiongateway.gov
+        <span class="chip disabled" title="Coming soon — acquisitiongateway adapter">
+          <i class="ti ti-clock" aria-hidden="true" style="font-size:13px"></i> Acq. Gateway
         </span>
         <span class="chip disabled" title="Coming soon — eVA adapter">
           <i class="ti ti-road" aria-hidden="true" style="font-size:13px"></i> eVA
@@ -462,7 +55,7 @@
 
     <div class="divider"></div>
 
-    <!-- State — all 50 states + DC + territories -->
+    <!-- State -->
     <div class="field">
       <label for="f-state">State (place of performance)</label>
       <select id="f-state">
@@ -513,7 +106,7 @@
         <option value="TX">Texas (TX)</option>
         <option value="UT">Utah (UT)</option>
         <option value="VT">Vermont (VT)</option>
-        <option value="VA" selected>Virginia (VA)</option>
+        <option value="VA">Virginia (VA)</option>
         <option value="WA">Washington (WA)</option>
         <option value="WV">West Virginia (WV)</option>
         <option value="WI">Wisconsin (WI)</option>
@@ -533,12 +126,12 @@
       <label for="f-ptype">Contract type</label>
       <select id="f-ptype">
         <option value="">All types</option>
-        <option value="o">Solicitation</option>
-        <option value="p">Pre-solicitation</option>
-        <option value="a">Award notice</option>
-        <option value="k">Combined synopsis / solicitation</option>
-        <option value="r">Sources sought</option>
-        <option value="s">Special notice</option>
+        <option value="Solicitation">Solicitation</option>
+        <option value="Pre-solicitation">Pre-solicitation</option>
+        <option value="Award Notice">Award notice</option>
+        <option value="Combined Synopsis">Combined synopsis / solicitation</option>
+        <option value="Sources Sought">Sources sought</option>
+        <option value="Special Notice">Special notice</option>
       </select>
     </div>
 
@@ -558,70 +151,36 @@
       </select>
     </div>
 
-    <!-- NAICS — DOT / DHS focused -->
+    <!-- NAICS -->
     <div class="field">
       <label>NAICS codes <span style="color:var(--text3);font-weight:400">(select one or more)</span></label>
       <div class="naics-grid" id="naics-grid">
-
         <div class="naics-group-label">Management &amp; consulting</div>
-        <div class="naics-tag" data-code="541611">
-          <span>Administrative mgmt. consulting</span>
-          <span class="naics-code">541611</span>
-        </div>
-        <div class="naics-tag" data-code="541618">
-          <span>Other mgmt. consulting</span>
-          <span class="naics-code">541618</span>
-        </div>
-        <div class="naics-tag" data-code="541690">
-          <span>Other scientific &amp; technical</span>
-          <span class="naics-code">541690</span>
-        </div>
-        <div class="naics-tag" data-code="541990">
-          <span>Other professional services</span>
-          <span class="naics-code">541990</span>
-        </div>
-
+        <div class="naics-tag" data-code="541611"><span>Administrative mgmt. consulting</span><span class="naics-code">541611</span></div>
+        <div class="naics-tag" data-code="541618"><span>Other mgmt. consulting</span><span class="naics-code">541618</span></div>
+        <div class="naics-tag" data-code="541690"><span>Other scientific &amp; technical</span><span class="naics-code">541690</span></div>
+        <div class="naics-tag" data-code="541990"><span>Other professional services</span><span class="naics-code">541990</span></div>
         <div class="naics-group-label">Engineering</div>
-        <div class="naics-tag" data-code="541330">
-          <span>Engineering services</span>
-          <span class="naics-code">541330</span>
-        </div>
-
+        <div class="naics-tag" data-code="541330"><span>Engineering services</span><span class="naics-code">541330</span></div>
         <div class="naics-group-label">IT &amp; technology</div>
-        <div class="naics-tag" data-code="541511">
-          <span>Custom computer programming</span>
-          <span class="naics-code">541511</span>
-        </div>
-        <div class="naics-tag" data-code="541512">
-          <span>Computer systems design</span>
-          <span class="naics-code">541512</span>
-        </div>
-        <div class="naics-tag" data-code="541513">
-          <span>Computer facilities mgmt.</span>
-          <span class="naics-code">541513</span>
-        </div>
-        <div class="naics-tag" data-code="541519">
-          <span>Other computer-related services</span>
-          <span class="naics-code">541519</span>
-        </div>
-
+        <div class="naics-tag" data-code="541511"><span>Custom computer programming</span><span class="naics-code">541511</span></div>
+        <div class="naics-tag" data-code="541512"><span>Computer systems design</span><span class="naics-code">541512</span></div>
+        <div class="naics-tag" data-code="541513"><span>Computer facilities mgmt.</span><span class="naics-code">541513</span></div>
+        <div class="naics-tag" data-code="541519"><span>Other computer-related services</span><span class="naics-code">541519</span></div>
       </div>
     </div>
 
-    <!-- Date range -->
-    <div class="field">
-      <label for="f-from">Posted from</label>
-      <input type="date" id="f-from" value="2026-01-01">
+    <!-- Sidebar buttons -->
+    <div class="sidebar-actions">
+      <button class="run-btn" id="run-btn" onclick="runSearch(0)">
+        <i class="ti ti-search" aria-hidden="true"></i>
+        Search contracts
+      </button>
+      <button class="clear-btn" id="clear-btn" onclick="clearFilters()">
+        <i class="ti ti-x" aria-hidden="true"></i>
+        Clear filters
+      </button>
     </div>
-    <div class="field">
-      <label for="f-to">Posted to</label>
-      <input type="date" id="f-to" value="2026-05-27">
-    </div>
-
-    <button class="run-btn" id="run-btn" onclick="runSearch(0)">
-      <i class="ti ti-search" aria-hidden="true"></i>
-      Search contracts
-    </button>
 
   </aside>
 
@@ -637,12 +196,15 @@
 </div>
 
 <script>
-  let selectedNaics = new Set();
-  let currentTotal  = 0;
-  let currentOffset = 0;
-  const PAGE_SIZE   = 20;
+  let selectedNaics  = new Set();
+  let currentItems   = [];   // full current result set for client-side sort
+  let currentTotal   = 0;
+  let currentOffset  = 0;
+  let sortField      = 'default';  // 'default' | 'posted_date'
+  let sortDir        = 'desc';     // 'asc' | 'desc'
+  const PAGE_SIZE    = 20;
 
-  /* NAICS toggle */
+  /* ── NAICS toggle ─────────────────────────────────────────── */
   document.querySelectorAll('.naics-tag').forEach(tag => {
     tag.addEventListener('click', () => {
       const code = tag.dataset.code;
@@ -656,7 +218,20 @@
     });
   });
 
-  /* Proxy health check */
+  /* ── Clear filters ────────────────────────────────────────── */
+  function clearFilters() {
+    document.getElementById('f-state').value = '';
+    document.getElementById('f-ptype').value = '';
+    document.getElementById('f-org').value   = '';
+    selectedNaics.clear();
+    document.querySelectorAll('.naics-tag.selected').forEach(t => t.classList.remove('selected'));
+    // Reset sort
+    sortField = 'default';
+    sortDir   = 'desc';
+    updateSortUI();
+  }
+
+  /* ── Proxy health check ───────────────────────────────────── */
   async function checkProxy() {
     const dot   = document.getElementById('status-dot');
     const label = document.getElementById('status-label');
@@ -667,11 +242,16 @@
       const res  = await fetch(`${base}/health`, { signal: AbortSignal.timeout(5000) });
       const data = await res.json();
       if (res.ok && data.status === 'ok') {
-        dot.className     = 'status-dot ok';
-        const mode        = data.mode === 'local'
-          ? `Local file · ${(data.local_records_loaded || 0).toLocaleString()} records`
-          : data.api_key_configured ? 'Live API · key set' : 'Live API · no key';
-        label.textContent = `Proxy connected · ${mode}`;
+        dot.className = 'status-dot ok';
+        let modeText = '';
+        if (data.mode === 'csv') {
+          modeText = `CSV mode · ${(data.csv_records_loaded || 0).toLocaleString()} records`;
+        } else if (data.mode === 'database') {
+          modeText = data.db_connected
+            ? `Database · ${(data.total_postings_in_db || 0).toLocaleString()} records`
+            : 'Database not connected';
+        }
+        label.textContent = `Proxy connected · ${modeText}`;
       } else {
         throw new Error('bad response');
       }
@@ -681,12 +261,51 @@
     }
   }
 
-  /* Date helpers */
-  function isoToSam(iso) {
-    const [y, m, d] = iso.split('-');
-    return `${m}/${d}/${y}`;
+  /* ── Sort logic ───────────────────────────────────────────── */
+  function sortItems(items) {
+    if (sortField === 'default') return items;
+    return [...items].sort((a, b) => {
+      const aVal = (a.posted_date || a.postedDate || '');
+      const bVal = (b.posted_date || b.postedDate || '');
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
   }
 
+  function updateSortUI() {
+    const select = document.getElementById('sort-select');
+    const dirBtn = document.getElementById('sort-dir-btn');
+    if (!select || !dirBtn) return;
+    select.value = sortField;
+    dirBtn.innerHTML = sortDir === 'desc'
+      ? '<i class="ti ti-arrow-down" aria-hidden="true"></i>'
+      : '<i class="ti ti-arrow-up" aria-hidden="true"></i>';
+    dirBtn.title = sortDir === 'desc' ? 'Descending — click to toggle' : 'Ascending — click to toggle';
+    // Hide direction button when on default sort
+    dirBtn.style.display = sortField === 'default' ? 'none' : 'flex';
+  }
+
+  function onSortChange() {
+    const select = document.getElementById('sort-select');
+    sortField = select.value;
+    // Reset direction to desc when changing sort field
+    sortDir = 'desc';
+    updateSortUI();
+    if (currentItems.length > 0) {
+      renderResults(currentItems, currentTotal, currentOffset);
+    }
+  }
+
+  function toggleSortDir() {
+    sortDir = sortDir === 'desc' ? 'asc' : 'desc';
+    updateSortUI();
+    if (currentItems.length > 0) {
+      renderResults(currentItems, currentTotal, currentOffset);
+    }
+  }
+
+  /* ── Date / badge helpers ─────────────────────────────────── */
   function fmtDate(d) {
     if (!d) return null;
     const dt = new Date(d);
@@ -699,29 +318,36 @@
     return diff >= 0 && diff <= 7;
   }
 
-  function badgeClass(type) {
-    const map = { o:'badge-o', a:'badge-a', p:'badge-p', r:'badge-r', k:'badge-k', s:'badge-s' };
-    return map[type] || 'badge-r';
+  function badgeClass(status) {
+    const s = (status || '').toLowerCase();
+    if (s.includes('award'))       return 'badge-a';
+    if (s.includes('pre-solicit')) return 'badge-p';
+    if (s.includes('solicit'))     return 'badge-o';
+    if (s.includes('combined'))    return 'badge-k';
+    if (s.includes('sources'))     return 'badge-r';
+    return 'badge-r';
   }
 
   function escHtml(str) {
-    return String(str)
+    return String(str || '')
       .replace(/&/g,'&amp;').replace(/</g,'&lt;')
       .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  /* Render card */
+  /* ── Render card ──────────────────────────────────────────── */
   function renderCard(c) {
     const soon    = isDeadlineSoon(c.deadline);
     const dlText  = c.deadline ? fmtDate(c.deadline) : 'No deadline set';
     const dlClass = soon ? 'meta-item deadline-warn' : 'meta-item';
-    const stateDisplay = c.popState || c.offState || c.state || 'N/A';
+    const place   = c.place_of_performance || c.popState || c.offState || 'N/A';
+    const posted  = c.posted_date || c.postedDate;
+    const status  = c.award_status || c.typeLabel || c.type || '—';
 
     return `
       <div class="card">
         <div class="card-top">
           <div class="card-title">${escHtml(c.title || '—')}</div>
-          <span class="type-badge ${badgeClass(c.type)}">${escHtml(c.typeLabel || c.type || '—')}</span>
+          <span class="type-badge ${badgeClass(status)}">${escHtml(status)}</span>
         </div>
         <div class="card-meta">
           <span class="meta-item">
@@ -730,11 +356,11 @@
           </span>
           <span class="meta-item">
             <i class="ti ti-map-pin" aria-hidden="true"></i>
-            ${escHtml(stateDisplay)}
+            ${escHtml(place)}
           </span>
           <span class="meta-item">
             <i class="ti ti-calendar" aria-hidden="true"></i>
-            Posted ${fmtDate(c.postedDate) || '—'}
+            Posted ${fmtDate(posted) || '—'}
           </span>
           <span class="${dlClass}">
             <i class="ti ti-clock" aria-hidden="true"></i>
@@ -742,104 +368,113 @@
           </span>
           <span class="meta-item">
             <i class="ti ti-tag" aria-hidden="true"></i>
-            NAICS ${escHtml(c.naicsCode || '—')}
+            NAICS ${escHtml(c.naics || c.naicsCode || '—')}
           </span>
-          <span class="source-pill">${escHtml(c.source || '—')}</span>
-          ${c.link ? `<a href="${escHtml(c.link)}" target="_blank" style="font-size:12px;color:var(--blue);text-decoration:none;display:flex;align-items:center;gap:3px"><i class="ti ti-external-link" aria-hidden="true" style="font-size:13px"></i>View on SAM.gov</a>` : ''}
+          <span class="source-pill">${escHtml(c.source_site || c.source || '—')}</span>
+          ${(c.url || c.link) ? `<a href="${escHtml(c.url || c.link)}" target="_blank" class="view-link"><i class="ti ti-external-link" aria-hidden="true"></i>View posting</a>` : ''}
         </div>
       </div>`;
   }
 
-  /* Main search */
+  /* ── Main search ──────────────────────────────────────────── */
   async function runSearch(offset) {
-    currentOffset = offset;
-    const base    = document.getElementById('proxy-url').value.trim();
-    const btn     = document.getElementById('run-btn');
-    const mainEl  = document.getElementById('main-content');
-    const fromISO = document.getElementById('f-from').value;
-    const toISO   = document.getElementById('f-to').value;
-    const state   = document.getElementById('f-state').value;
-    const ptype   = document.getElementById('f-ptype').value;
-    const org     = document.getElementById('f-org').value;
+    currentOffset  = offset;
+    const base     = document.getElementById('proxy-url').value.trim();
+    const btn      = document.getElementById('run-btn');
+    const mainEl   = document.getElementById('main-content');
+    const state    = document.getElementById('f-state').value;
+    const ptype    = document.getElementById('f-ptype').value;
+    const org      = document.getElementById('f-org').value;
 
-    btn.disabled   = true;
+    btn.disabled     = true;
     mainEl.innerHTML = `<div class="state-panel"><div class="spinner"></div><p>Fetching contracts…</p></div>`;
 
-    const params = new URLSearchParams({
-      postedFrom: isoToSam(fromISO),
-      postedTo:   isoToSam(toISO),
-      limit:      PAGE_SIZE,
-      offset:     offset,
-    });
+    // When NAICS codes are selected, fetch a large batch and filter client-side
+    // This is necessary because the proxy only supports single NAICS filtering
+    const fetchLimit = selectedNaics.size > 0 ? 1000 : PAGE_SIZE;
 
+    const params = new URLSearchParams({ limit: fetchLimit, offset: selectedNaics.size > 0 ? 0 : offset });
     if (state) params.set('state', state);
-    if (ptype) params.set('ptype', ptype);
-    if (org)   params.set('organizationName', org);
-
-    // Send ncode only when exactly one NAICS is selected (API limitation)
-    // For multi-select or none, filtering is done client-side after results return
-    if (selectedNaics.size === 1) {
-      params.set('ncode', [...selectedNaics][0]);
-    }
+    if (ptype) params.set('contractType', ptype);
+    if (org)   params.set('agency', org);
 
     try {
-      const res = await fetch(`${base}/api/opportunities?${params}`, {
-        signal: AbortSignal.timeout(20000)
-      });
+        const res = await fetch(`${base}/api/opportunities?${params}`, {
+            signal: AbortSignal.timeout(30000)
+        });
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-        throw new Error(err.error || `HTTP ${res.status}`);
-      }
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+            throw new Error(err.error || `HTTP ${res.status}`);
+        }
 
-      const data  = await res.json();
-      let items   = data.opportunities || [];
+        const data = await res.json();
+        let items  = data.opportunities || [];
+        let total  = data.total;
 
-      // Client-side NAICS filter for multi-select
-      if (selectedNaics.size > 1) {
-        items = items.filter(c => selectedNaics.has(String(c.naicsCode)));
-      }
+        // OR filter — keep records matching ANY selected NAICS code
+        if (selectedNaics.size > 0) {
+            items = items.filter(c => selectedNaics.has(String(c.naics || c.naicsCode || '')));
+            total = items.length;
+            // Apply pagination manually on the filtered results
+            items = items.slice(offset, offset + PAGE_SIZE);
+        }
 
-      renderResults(items, data.total, offset);
+        currentItems = items;
+        currentTotal = total;
+        renderResults(items, total, offset);
 
     } catch (err) {
-      let detail = '';
-      if (err.message.includes('fetch') || err.message.includes('Failed')) {
-        detail = `<br><br>Make sure <code>proxy.py</code> is running at <strong>${escHtml(base)}</strong> and click <strong>Check proxy</strong> above.`;
-      }
-      mainEl.innerHTML = `
-        <div class="error-panel">
-          <strong><i class="ti ti-alert-circle"></i> Error:</strong> ${escHtml(err.message)}${detail}
-        </div>`;
+        let detail = '';
+        if (err.message.includes('fetch') || err.message.includes('Failed')) {
+            detail = `<br><br>Make sure <code>proxy.py</code> is running at <strong>${escHtml(base)}</strong> and click <strong>Check proxy</strong> above.`;
+        }
+        mainEl.innerHTML = `
+            <div class="error-panel">
+                <strong><i class="ti ti-alert-circle"></i> Error:</strong> ${escHtml(err.message)}${detail}
+            </div>`;
     }
 
     btn.disabled = false;
   }
 
-  /* Render results */
+  /* ── Render results ───────────────────────────────────────── */
   function renderResults(items, total, offset) {
     const mainEl  = document.getElementById('main-content');
     const page    = Math.floor(offset / PAGE_SIZE) + 1;
     const maxPage = Math.ceil(total / PAGE_SIZE);
     const showing = Math.min(offset + PAGE_SIZE, total);
 
+    const sorted  = sortItems(items);
+
+    // Results header with sort controls
     let html = `
       <div class="results-header">
         <p class="results-count">
           <strong>${total.toLocaleString()}</strong> contract${total !== 1 ? 's' : ''} found
           &nbsp;·&nbsp; showing ${offset + 1}–${showing}
         </p>
+        <div class="sort-controls">
+          <span class="sort-label">Sort by</span>
+          <select class="sort-select" id="sort-select" onchange="onSortChange()">
+            <option value="default">Default</option>
+            <option value="posted_date">Date posted</option>
+          </select>
+          <button class="sort-dir-btn" id="sort-dir-btn" onclick="toggleSortDir()" title="Toggle sort direction" style="display:none">
+            <i class="ti ti-arrow-down" aria-hidden="true"></i>
+          </button>
+        </div>
       </div>`;
 
-    if (items.length === 0) {
+    if (sorted.length === 0) {
       html += `
         <div class="state-panel">
           <i class="ti ti-mood-empty" aria-hidden="true"></i>
           <p>No contracts match these filters</p>
-          <small>Try widening the date range or removing a filter</small>
+          <small>Try removing a filter</small>
         </div>`;
     } else {
-      html += `<div class="cards">${items.map(renderCard).join('')}</div>`;
+      html += `<div class="cards">${sorted.map(renderCard).join('')}</div>`;
     }
 
     if (total > PAGE_SIZE) {
@@ -856,6 +491,10 @@
     }
 
     mainEl.innerHTML = html;
+
+    // Restore sort select state after re-render
+    updateSortUI();
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 </script>

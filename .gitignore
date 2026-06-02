@@ -1,0 +1,23 @@
+# Environment variables
+.env
+
+# SAM.gov data files
+sam_opportunities.csv
+
+# Database files
+*.db
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# IDE files
+.vscode/
+.idea/

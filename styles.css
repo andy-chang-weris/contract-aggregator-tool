@@ -61,8 +61,8 @@
   --shadow:      0 1px 4px rgba(66,100,128,.10), 0 1px 2px rgba(66,100,128,.06);
   --shadow-md:   0 4px 16px rgba(66,100,128,.12), 0 2px 4px rgba(66,100,128,.06);
   --mono:        'IBM Plex Mono', monospace;
-  --sans:        'DM Sans', system-ui, sans-serif;
-  --display:     'DM Sans', system-ui, sans-serif;
+  --sans:        'Lato', system-ui, sans-serif;
+  --display:     'Zilla Slab', Georgia, serif;
 }
 
 /* ── Base ─────────────────────────────────────────────────── */
@@ -678,3 +678,56 @@ aside::-webkit-scrollbar-thumb:hover { background: var(--teal); }
 
 .view-link:hover { color: var(--navy); }
 .view-link i { font-size: 13px; }
+
+/* ── Typography — Weris brand fonts ──────────────────────────
+   Zilla Slab Bold  → headers, card titles, logo app name,
+                      results count strong, section labels
+   Lato Regular     → all body copy (already set on body via --sans)
+   ─────────────────────────────────────────────────────────── */
+
+/* Card titles — primary heading on each contract */
+.card-title {
+  font-family: var(--display);
+  font-weight: 700;
+}
+
+/* Results count — "80,893 contracts found" */
+.results-count strong {
+  font-family: var(--display);
+  font-weight: 700;
+}
+
+/* Section labels in sidebar */
+.section-label {
+  font-family: var(--sans);   /* stays Lato — too small for slab serif */
+}
+
+/* Logo app name in header */
+.logo-app-name {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 14px;             /* slightly larger to suit the slab serif */
+}
+
+/* State panel heading (empty state / loading) */
+.state-panel p {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--navy);
+}
+
+/* NAICS group labels */
+.naics-group-label {
+  font-family: var(--sans);   /* stays Lato — uppercase label style */
+}
+
+/* Search button — keep Lato for UI controls */
+.run-btn,
+.clear-btn,
+.check-btn,
+.page-btn,
+.sort-select,
+.sort-label {
+  font-family: var(--sans);
+}

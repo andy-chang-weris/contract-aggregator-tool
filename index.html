@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WERIS — Contract Intelligence</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@700&family=Lato:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -389,50 +389,43 @@
     btn.disabled     = true;
     mainEl.innerHTML = `<div class="state-panel"><div class="spinner"></div><p>Fetching contracts…</p></div>`;
 
-    // When NAICS codes are selected, fetch a large batch and filter client-side
-    // This is necessary because the proxy only supports single NAICS filtering
-    const fetchLimit = selectedNaics.size > 0 ? 1000 : PAGE_SIZE;
-
-    const params = new URLSearchParams({ limit: fetchLimit, offset: selectedNaics.size > 0 ? 0 : offset });
+    const params = new URLSearchParams({ limit: PAGE_SIZE, offset });
     if (state) params.set('state', state);
     if (ptype) params.set('contractType', ptype);
     if (org)   params.set('agency', org);
+    if (selectedNaics.size === 1) params.set('naics', [...selectedNaics][0]);
 
     try {
-        const res = await fetch(`${base}/api/opportunities?${params}`, {
-            signal: AbortSignal.timeout(30000)
-        });
+      const res = await fetch(`${base}/api/opportunities?${params}`, {
+        signal: AbortSignal.timeout(20000)
+      });
 
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-            throw new Error(err.error || `HTTP ${res.status}`);
-        }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
 
-        const data = await res.json();
-        let items  = data.opportunities || [];
-        let total  = data.total;
+      const data = await res.json();
+      let items  = data.opportunities || [];
 
-        // OR filter — keep records matching ANY selected NAICS code
-        if (selectedNaics.size > 0) {
-            items = items.filter(c => selectedNaics.has(String(c.naics || c.naicsCode || '')));
-            total = items.length;
-            // Apply pagination manually on the filtered results
-            items = items.slice(offset, offset + PAGE_SIZE);
-        }
+      // Client-side NAICS multi-select filter
+      if (selectedNaics.size > 1) {
+        items = items.filter(c => selectedNaics.has(String(c.naics || c.naicsCode)));
+      }
 
-        currentItems = items;
-        currentTotal = total;
-        renderResults(items, total, offset);
+      currentItems = items;
+      currentTotal = data.total;
+      renderResults(items, data.total, offset);
 
     } catch (err) {
-        let detail = '';
-        if (err.message.includes('fetch') || err.message.includes('Failed')) {
-            detail = `<br><br>Make sure <code>proxy.py</code> is running at <strong>${escHtml(base)}</strong> and click <strong>Check proxy</strong> above.`;
-        }
-        mainEl.innerHTML = `
-            <div class="error-panel">
-                <strong><i class="ti ti-alert-circle"></i> Error:</strong> ${escHtml(err.message)}${detail}
-            </div>`;
+      let detail = '';
+      if (err.message.includes('fetch') || err.message.includes('Failed')) {
+        detail = `<br><br>Make sure <code>proxy.py</code> is running at <strong>${escHtml(base)}</strong> and click <strong>Check proxy</strong> above.`;
+      }
+      mainEl.innerHTML = `
+        <div class="error-panel">
+          <strong><i class="ti ti-alert-circle"></i> Error:</strong> ${escHtml(err.message)}${detail}
+        </div>`;
     }
 
     btn.disabled = false;

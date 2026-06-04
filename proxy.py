@@ -1,16 +1,5 @@
 """
 proxy.py — Flask API server
-
-MODE DETECTION (automatic on startup):
-  1. CSV MODE   — if sam_opportunities.csv exists in project folder
-                  No database needed. Filters applied in Python.
-  2. DB MODE    — if PostgreSQL credentials are set in .env
-                  Requires db.py and run_all.py to have been run first.
-
-Endpoints:
-  GET /health                — status check, shows current mode
-  GET /cache/clear           — clear in-memory cache
-  GET /api/opportunities     — paginated contract listings with filters
 """
 
 import os

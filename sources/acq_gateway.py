@@ -91,9 +91,10 @@ def fetch_and_parse():
     if data is None:
         return []
 
-    total = int(data.get("total", 0))
-    page_size = 25  # confirmed from response
-    total_pages = -(-total // page_size)  # ceiling division
+    listing_meta = data.get("listing", {})
+    total = int(listing_meta.get("total") or 0)
+    page_size = 25
+    total_pages = -(-total // page_size)
     print(f"Total listings: {total} across ~{total_pages} pages")
 
     while True:
@@ -116,7 +117,7 @@ def fetch_and_parse():
             break
 
         page += 1
-        time.sleep(1)
+        time.sleep(0.2)
         _, listings = fetch_page(page)
 
     return all_postings

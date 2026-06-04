@@ -1,10 +1,10 @@
 """
-SAM.gov parser — fetch and normalize contract opportunities.
+SAM.gov parser
 
 LOCAL MODE: reads from sam_opportunities.csv (downloaded from sam.gov/data-services)
-            No API key needed. No rate limits. Filters applied in Python.
+            No API key needed. No rate limits.
 
-LIVE MODE:  calls SAM.gov API directly. Requires SAM_API_KEY in .env.
+LIVE MODE:  calls SAM.gov API directly.
 """
 
 import os
@@ -115,7 +115,7 @@ def normalize_csv_record(row):
     }
 
 
-# ── Normalize a JSON record (live API or JSON bulk) → agreed schema ───────────
+# ── Normalize a JSON record (live API or JSON bulk) → schema ───────────
 def normalize_json_record(opp):
     _, type_label = normalize_type(opp.get("type") or opp.get("Type") or "")
 
@@ -131,7 +131,7 @@ def normalize_json_record(opp):
     agency  = opp.get("fullParentPathName") or ".".join(p for p in [dept, subtier] if p) or None
 
     return {
-        # ── Agreed schema fields ──────────────────────────────────────────
+        # ── Schema fields ──────────────────────────────────────────
         "source_site":          "SAM.gov",
         "external_id":          opp.get("noticeId") or opp.get("NoticeId"),
         "title":                opp.get("title")    or opp.get("Title"),

@@ -5,13 +5,6 @@ Handles:
   - Table creation and safe column migrations
   - Batch inserts with deduplication
   - In-memory deduplication before storing
-
-Requires these environment variables in .env:
-  DB_HOST      e.g. localhost
-  DB_PORT      e.g. 5432
-  DB_NAME      e.g. govcontracts
-  DB_USER      e.g. postgres
-  DB_PASSWORD  e.g. yourpassword
 """
 
 import os
@@ -168,7 +161,7 @@ def store_postings(postings):
 
     inserted = 0
     skipped  = 0
-    BATCH_SIZE = 500  # insert 500 rows per round trip instead of 1
+    BATCH_SIZE = 500
 
     try:
         for i in range(0, len(postings), BATCH_SIZE):

@@ -41,12 +41,14 @@
     <div>
       <p class="section-label">Data sources</p>
       <div class="source-chips">
-        <span class="chip active" id="chip-sam">
+        <a class="chip active" href="https://sam.gov/opportunities" target="_blank" rel="noopener noreferrer" title="Open SAM.gov in new tab">
           <i class="ti ti-building-community" aria-hidden="true" style="font-size:13px"></i> SAM.gov
-        </span>
-        <span class="chip disabled" title="Coming soon — acquisitiongateway adapter">
-          <i class="ti ti-clock" aria-hidden="true" style="font-size:13px"></i> Acq. Gateway
-        </span>
+          <i class="ti ti-external-link chip-ext" aria-hidden="true"></i>
+        </a>
+        <a class="chip active" href="https://acquisitiongateway.gov/forecast" target="_blank" rel="noopener noreferrer" title="Open Acquisition Gateway Forecast in new tab">
+          <i class="ti ti-chart-bar" aria-hidden="true" style="font-size:13px"></i> Acq. Gateway
+          <i class="ti ti-external-link chip-ext" aria-hidden="true"></i>
+        </a>
         <span class="chip disabled" title="Coming soon — eVA adapter">
           <i class="ti ti-road" aria-hidden="true" style="font-size:13px"></i> eVA
         </span>
@@ -126,12 +128,27 @@
       <label for="f-ptype">Contract type</label>
       <select id="f-ptype">
         <option value="">All types</option>
-        <option value="Solicitation">Solicitation</option>
-        <option value="Pre-solicitation">Pre-solicitation</option>
-        <option value="Award Notice">Award notice</option>
-        <option value="Combined Synopsis">Combined synopsis / solicitation</option>
-        <option value="Sources Sought">Sources sought</option>
-        <option value="Special Notice">Special notice</option>
+      
+        <optgroup label="SAM.gov">
+          <option value="Combined Synopsis">Combined Synopsis / Solicitation</option>
+          <option value="Solicitation">Solicitation</option>
+          <option value="Award Notice">Award Notice</option>
+          <option value="Sources Sought">Sources Sought</option>
+          <option value="Presolicitation">Pre-solicitation</option>
+          <option value="Special Notice">Special Notice</option>
+          <option value="Justification">Justification</option>
+          <option value="Modification">Modification / Amendment / Cancel</option>
+        </optgroup>
+      
+        <optgroup label="Acquisition Gateway">
+          <option value="Acquisition Planning">Acquisition Planning</option>
+          <option value="Solicitation Issued">Solicitation Issued</option>
+          <option value="Drafting Solicitation">Drafting Solicitation</option>
+          <option value="Evaluation Stage">Evaluation Stage</option>
+          <option value="Awarded">Awarded</option>
+          <option value="Market Research">Market Research</option>
+        </optgroup>
+      
       </select>
     </div>
 
@@ -197,11 +214,11 @@
 
 <script>
   let selectedNaics  = new Set();
-  let currentItems   = [];   // full current result set for client-side sort
+  let currentItems   = [];
   let currentTotal   = 0;
   let currentOffset  = 0;
-  let sortField      = 'default';  // 'default' | 'posted_date'
-  let sortDir        = 'desc';     // 'asc' | 'desc'
+  let sortField      = 'default';
+  let sortDir        = 'desc';
   const PAGE_SIZE    = 20;
 
   /* ── NAICS toggle ─────────────────────────────────────────── */
@@ -225,10 +242,6 @@
     document.getElementById('f-org').value   = '';
     selectedNaics.clear();
     document.querySelectorAll('.naics-tag.selected').forEach(t => t.classList.remove('selected'));
-    // Reset sort
-    sortField = 'default';
-    sortDir   = 'desc';
-    updateSortUI();
   }
 
   /* ── Proxy health check ───────────────────────────────────── */
@@ -261,6 +274,7 @@
     }
   }
 
+  /* ── Sort UI ──────────────────────────────────────────────── */
   function updateSortUI() {
     const select = document.getElementById('sort-select');
     const dirBtn = document.getElementById('sort-dir-btn');
@@ -270,23 +284,22 @@
       ? '<i class="ti ti-arrow-down" aria-hidden="true"></i>'
       : '<i class="ti ti-arrow-up" aria-hidden="true"></i>';
     dirBtn.title = sortDir === 'desc' ? 'Descending — click to toggle' : 'Ascending — click to toggle';
-    // Hide direction button when on default sort
     dirBtn.style.display = sortField === 'default' ? 'none' : 'flex';
   }
 
   function onSortChange() {
     const select = document.getElementById('sort-select');
     sortField = select.value;
-    sortDir   = 'desc';  // reset direction when field changes
-    runSearch(0);        // re-fetch from server with new sort
+    sortDir   = 'desc';
+    runSearch(0);
   }
 
   function toggleSortDir() {
     sortDir = sortDir === 'desc' ? 'asc' : 'desc';
-    runSearch(0);        // re-fetch from server with new direction
+    runSearch(0);
   }
 
-  /* ── Date / badge helpers ─────────────────────────────────── */
+  /* ── Helpers ──────────────────────────────────────────────── */
   function fmtDate(d) {
     if (!d) return null;
     const dt = new Date(d);
@@ -371,40 +384,37 @@
     mainEl.innerHTML = `<div class="state-panel"><div class="spinner"></div><p>Fetching contracts…</p></div>`;
 
     const params = new URLSearchParams({ limit: PAGE_SIZE, offset });
-    if (state) params.set('state', state);
-    if (ptype) params.set('contractType', ptype);
-    if (org)   params.set('agency', org);
-    if (selectedNaics.size > 0) params.set('naics', [...selectedNaics].join(','));
+    if (state)                   params.set('state', state);
+    if (ptype)                   params.set('contractType', ptype);
+    if (org)                     params.set('agency', org);
+    if (selectedNaics.size > 0)  params.set('naics', [...selectedNaics].join(','));
     if (sortField !== 'default') params.set('sortBy', sortField);
     params.set('sortDir', sortDir);
 
     try {
-        const res = await fetch(`${base}/api/opportunities?${params}`, {
-            signal: AbortSignal.timeout(30000)
-        });
+      const res = await fetch(`${base}/api/opportunities?${params}`, {
+        signal: AbortSignal.timeout(30000)
+      });
 
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-            throw new Error(err.error || `HTTP ${res.status}`);
-        }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
 
-        const data = await res.json();
-        let items  = data.opportunities || [];
-        let total  = data.total;
-
-        currentItems = items;
-        currentTotal = total;
-        renderResults(items, total, offset);
+      const data = await res.json();
+      currentItems = data.opportunities || [];
+      currentTotal = data.total;
+      renderResults(currentItems, data.total, offset);
 
     } catch (err) {
-        let detail = '';
-        if (err.message.includes('fetch') || err.message.includes('Failed')) {
-            detail = `<br><br>Make sure <code>proxy.py</code> is running at <strong>${escHtml(base)}</strong> and click <strong>Check proxy</strong> above.`;
-        }
-        mainEl.innerHTML = `
-            <div class="error-panel">
-                <strong><i class="ti ti-alert-circle"></i> Error:</strong> ${escHtml(err.message)}${detail}
-            </div>`;
+      let detail = '';
+      if (err.message.includes('fetch') || err.message.includes('Failed')) {
+        detail = `<br><br>Make sure <code>proxy.py</code> is running at <strong>${escHtml(base)}</strong> and click <strong>Check proxy</strong> above.`;
+      }
+      mainEl.innerHTML = `
+        <div class="error-panel">
+          <strong><i class="ti ti-alert-circle"></i> Error:</strong> ${escHtml(err.message)}${detail}
+        </div>`;
     }
 
     btn.disabled = false;
@@ -417,9 +427,6 @@
     const maxPage = Math.ceil(total / PAGE_SIZE);
     const showing = Math.min(offset + PAGE_SIZE, total);
 
-    const sorted = items;
-
-    // Results header with sort controls
     let html = `
       <div class="results-header">
         <p class="results-count">
@@ -438,7 +445,7 @@
         </div>
       </div>`;
 
-    if (sorted.length === 0) {
+    if (items.length === 0) {
       html += `
         <div class="state-panel">
           <i class="ti ti-mood-empty" aria-hidden="true"></i>
@@ -446,7 +453,7 @@
           <small>Try removing a filter</small>
         </div>`;
     } else {
-      html += `<div class="cards">${sorted.map(renderCard).join('')}</div>`;
+      html += `<div class="cards">${items.map(renderCard).join('')}</div>`;
     }
 
     if (total > PAGE_SIZE) {
@@ -463,10 +470,7 @@
     }
 
     mainEl.innerHTML = html;
-
-    // Restore sort select state after re-render
     updateSortUI();
-
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 </script>

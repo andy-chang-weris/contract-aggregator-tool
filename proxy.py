@@ -143,7 +143,7 @@ def opportunities():
         conditions.append(f"naics IN ({placeholders})")
         params.extend(naics_list)
     if contract_type:
-        conditions.append("contract_type ILIKE %s")
+        conditions.append("award_status ILIKE %s")
         params.append(f"%{contract_type}%")
     if state:
         conditions.append("place_of_performance ILIKE %s")

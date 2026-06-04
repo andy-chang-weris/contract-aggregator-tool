@@ -729,3 +729,46 @@ aside::-webkit-scrollbar-thumb:hover { background: var(--teal); }
 .sort-label {
   font-family: var(--sans);
 }
+
+/* ── NAICS selected state — stronger visual distinction ───── */
+.naics-tag.selected {
+  background: var(--navy) !important;
+  color: #ffffff !important;
+  border-color: var(--navy) !important;
+  font-weight: 600;
+}
+
+.naics-tag.selected .naics-code {
+  opacity: .75;
+  color: rgba(255,255,255,.85);
+}
+
+.naics-tag.selected:hover {
+  background: var(--navy-dark) !important;
+  border-color: var(--navy-dark) !important;
+}
+
+/* ── Source chips as links ────────────────────────────────── */
+a.chip {
+  text-decoration: none;
+  cursor: pointer;
+}
+
+a.chip.active {
+  background: var(--navy);
+  color: #fff;
+  border-color: var(--navy);
+}
+
+a.chip.active:hover {
+  background: var(--navy-dark);
+  border-color: var(--navy-dark);
+  color: #fff;
+}
+
+/* Small external link icon inside chip */
+.chip-ext {
+  font-size: 10px;
+  opacity: .65;
+  margin-left: 1px;
+}

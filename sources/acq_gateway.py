@@ -42,7 +42,7 @@ def parse_listing(nid, entry):
         "title":         values.get("title"),
         "agency":        render.get("field_result_id"),          # e.g. "General Services Administration"
         "organization":  render.get("field_organization"),       # e.g. "FAS-Federal Acquisition Service"
-        "naics":         render.get("field_naics_code"),         # already a readable label in render — but HTML, so:
+        "naics":         extract_naics_code(render.get("field_naics_code")),         # already a readable label in render — but HTML, so:
         "description":   clean_html(render.get("body", "")),     # strip <p> tags
         "award_date":    values.get("field_estimated_award_fy"), # fiscal year e.g. "2026"
         "deadline":      pop_start,                              # period of performance start date YYYY-MM-DD
@@ -57,6 +57,16 @@ def parse_listing(nid, entry):
         "raw_response":  json.dumps(entry),
     }
 
+def extract_naics_code(raw):
+    """Pull just the numeric NAICS code from an HTML field."""
+    if not raw:
+        return None
+    # Strip HTML tags first
+    text = clean_html(raw)
+    # NAICS codes are 6 digits — grab the first 6-digit number found
+    import re
+    match = re.search(r'\b\d{6}\b', text)
+    return match.group(0) if match else text.strip() or None
 
 def fetch_page(page_number):
     response = requests.get(

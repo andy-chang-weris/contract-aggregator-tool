@@ -1,5 +1,5 @@
 """
-proxy.py — Flask API server for the GovContracts dashboard.
+proxy.py — Flask API server
 
 MODE DETECTION (automatic on startup):
   1. CSV MODE   — if sam_opportunities.csv exists in project folder

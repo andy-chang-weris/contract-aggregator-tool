@@ -2,7 +2,7 @@
 .env
 
 # SAM.gov data files
-sam_opportunities.csv
+*.csv
 
 # Database files
 *.db

@@ -1,5 +1,5 @@
 """
-db.py — PostgreSQL database layer for GovContracts.
+db.py — PostgreSQL database layer
 
 Handles:
   - Table creation and safe column migrations
@@ -159,11 +159,6 @@ def deduplicate(postings):
 
 # ── Store ─────────────────────────────────────────────────────────────────────
 def store_postings(postings):
-    """
-    Inserts a list of normalized postings into PostgreSQL.
-    Uses ON CONFLICT DO NOTHING to skip duplicates by url.
-    All inserts run in a single transaction for performance.
-    """
     if not postings:
         print("  [db] No postings to store.")
         return 0
@@ -173,10 +168,30 @@ def store_postings(postings):
 
     inserted = 0
     skipped  = 0
+    BATCH_SIZE = 500  # insert 500 rows per round trip instead of 1
 
     try:
-        for posting in postings:
-            cursor.execute("""
+        for i in range(0, len(postings), BATCH_SIZE):
+            batch = postings[i: i + BATCH_SIZE]
+
+            # Build values list for this batch
+            values = []
+            for p in batch:
+                values.append((
+                    p.get("source_site"),   p.get("external_id"),
+                    p.get("url"),           p.get("agency"),
+                    p.get("naics"),         p.get("posted_date"),
+                    p.get("contract_type"), p.get("place_of_performance"),
+                    p.get("title"),         p.get("organization"),
+                    p.get("description"),   p.get("deadline"),
+                    p.get("award_date"),    p.get("contract_value"),
+                    p.get("award_status"),  p.get("acq_strategy"),
+                    p.get("source_listing_id"),
+                    p.get("date_scraped"),  p.get("raw_response"),
+                ))
+
+            # executemany sends the whole batch in one round trip
+            cursor.executemany("""
                 INSERT INTO postings (
                     source_site, external_id, url,
                     agency, naics, posted_date, contract_type, place_of_performance,
@@ -184,41 +199,18 @@ def store_postings(postings):
                     contract_value, award_status, acq_strategy, source_listing_id,
                     date_scraped, raw_response
                 ) VALUES (
-                    %(source_site)s, %(external_id)s, %(url)s,
-                    %(agency)s, %(naics)s, %(posted_date)s, %(contract_type)s, %(place_of_performance)s,
-                    %(title)s, %(organization)s, %(description)s, %(deadline)s, %(award_date)s,
-                    %(contract_value)s, %(award_status)s, %(acq_strategy)s, %(source_listing_id)s,
-                    %(date_scraped)s, %(raw_response)s
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s
                 )
                 ON CONFLICT (url) DO NOTHING
-            """, {
-                "source_site":          posting.get("source_site"),
-                "external_id":          posting.get("external_id"),
-                "url":                  posting.get("url"),
-                "agency":               posting.get("agency"),
-                "naics":                posting.get("naics"),
-                "posted_date":          posting.get("posted_date"),
-                "contract_type":        posting.get("contract_type"),
-                "place_of_performance": posting.get("place_of_performance"),
-                "title":                posting.get("title"),
-                "organization":         posting.get("organization"),
-                "description":          posting.get("description"),
-                "deadline":             posting.get("deadline"),
-                "award_date":           posting.get("award_date"),
-                "contract_value":       posting.get("contract_value"),
-                "award_status":         posting.get("award_status"),
-                "acq_strategy":         posting.get("acq_strategy"),
-                "source_listing_id":    posting.get("source_listing_id"),
-                "date_scraped":         posting.get("date_scraped"),
-                "raw_response":         posting.get("raw_response"),
-            })
+            """, values)
 
-            if cursor.rowcount > 0:
-                inserted += 1
-            else:
-                skipped += 1
+            batch_inserted = cursor.rowcount
+            inserted += batch_inserted
+            skipped  += len(batch) - batch_inserted
 
-        conn.commit()
+            conn.commit()
+            print(f"  [db] Batch {i // BATCH_SIZE + 1}: inserted {batch_inserted} / {len(batch)}")
 
     except Exception as e:
         conn.rollback()
@@ -231,3 +223,38 @@ def store_postings(postings):
 
     print(f"  [db] Inserted: {inserted} | Skipped (duplicates): {skipped}")
     return inserted
+
+def remove_expired(days_grace=0):
+    """
+    Deletes postings whose deadline has passed.
+    days_grace: how many days after deadline before deleting.
+                0 = delete same day it expires
+                1 = keep for 1 day after deadline, then delete
+    """
+    conn   = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            DELETE FROM postings
+            WHERE deadline IS NOT NULL
+            AND deadline < (CURRENT_DATE - %s * INTERVAL '1 day')::TEXT
+        """, (days_grace,))
+
+        deleted = cursor.rowcount
+        conn.commit()
+        print(f"  [db] Removed {deleted} expired postings.")
+        return deleted
+
+    except Exception as e:
+        conn.rollback()
+        print(f"  [db] Cleanup failed: {e}")
+        raise
+
+    finally:
+        cursor.close()
+        conn.close()
+
+if __name__ == "__main__":
+    print("  [db] Connecting to database...")
+    setup_database()

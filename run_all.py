@@ -1,9 +1,13 @@
-from db import setup_database, store_postings, deduplicate
+from db import setup_database, store_postings, deduplicate, remove_expired
 from sources.sam_gov import fetch_and_parse as fetch_sam
 from sources.acq_gateway import fetch_and_parse as fetch_acq
 
 def run():
     setup_database()
+
+    # Remove expired contracts first
+    remove_expired(days_grace=1) # keeps contracts for 1 day after deadline
+
     all_postings = []
 
     sources = [

@@ -1,5 +1,6 @@
 """
 proxy.py — Flask API server
+Virginia contracts only — state filter removed.
 """
 
 import os
@@ -7,7 +8,6 @@ import json
 import time
 import psycopg2
 import psycopg2.extras
-from datetime import datetime
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
@@ -21,8 +21,8 @@ app = Flask(__name__)
 CORS(app)
 
 CACHE_TTL_SECONDS = 3600
+_cache = {}
 
-_cache        = {}
 
 # ── Cache helpers ─────────────────────────────────────────────────────────────
 def cache_get(key):
@@ -53,7 +53,6 @@ def health():
         1 for e in _cache.values()
         if (time.time() - e["ts"]) < CACHE_TTL_SECONDS
     )
-
     total = 0
     db_ok = False
     try:
@@ -89,18 +88,16 @@ def opportunities():
     limit  = max(1, min(int(request.args.get("limit",  20)), 1000))
     offset = max(0, int(request.args.get("offset", 0)))
 
-    # ── Filters (no date filters) ─────────────────────────────────────────
+    # ── Filters — state removed, all records are Virginia ─────────────────
     agency        = (request.args.get("agency")       or "").strip()
-    naics_raw = request.args.get("naics") or ""
-    naics_list = [n.strip() for n in naics_raw.split(",") if n.strip()]
+    naics_raw     = request.args.get("naics")         or ""
+    naics_list    = [n.strip() for n in naics_raw.split(",") if n.strip()]
     contract_type = (request.args.get("contractType") or "").strip()
-    state         = (request.args.get("state")        or "").strip()
     source        = (request.args.get("source")       or "").strip()
 
-    sort_by  = (request.args.get("sortBy")  or "").strip()   # "posted_date" or ""
+    sort_by  = (request.args.get("sortBy")  or "").strip()
     sort_dir = (request.args.get("sortDir") or "desc").strip().lower()
 
-    # Whitelist allowed sort fields — never pass raw user input to SQL
     ALLOWED_SORT_FIELDS = {"posted_date"}
     if sort_by not in ALLOWED_SORT_FIELDS:
         sort_by = None
@@ -109,18 +106,17 @@ def opportunities():
 
     # ── Cache key ─────────────────────────────────────────────────────────
     cache_key = json.dumps({
-        "limit": limit, "offset": offset, "agency": agency,
-        "naics": naics_raw, "contractType": contract_type,
-        "state": state, "source": source,
-        "sortBy":  sort_by,
-        "sortDir": sort_dir,
+        "limit": limit, "offset": offset,
+        "agency": agency, "naics": naics_raw,
+        "contractType": contract_type, "source": source,
+        "sortBy": sort_by, "sortDir": sort_dir,
     }, sort_keys=True)
 
     cached = cache_get(cache_key)
     if cached:
         return jsonify({**cached, "cached": True})
 
-    # ── Database mode ─────────────────────────────────────────────────────
+    # ── Build WHERE clause ────────────────────────────────────────────────
     conditions = []
     params     = []
 
@@ -134,9 +130,6 @@ def opportunities():
     if contract_type:
         conditions.append("award_status ILIKE %s")
         params.append(f"%{contract_type}%")
-    if state:
-        conditions.append("place_of_performance ILIKE %s")
-        params.append(f"%{state}%")
     if source:
         conditions.append("source_site = %s")
         params.append(source)
@@ -150,11 +143,8 @@ def opportunities():
         cursor.execute(f"SELECT COUNT(*) FROM postings {where}", params)
         total = cursor.fetchone()["count"]
 
-        # Build ORDER BY clause safely using whitelist
-        if sort_by == "posted_date":
-            order = f"ORDER BY posted_date {sort_dir.upper()}"
-        else:
-            order = "ORDER BY date_scraped DESC"  # default — newest scraped first
+        order = f"ORDER BY posted_date {sort_dir.upper()}" if sort_by == "posted_date" \
+                else "ORDER BY date_scraped DESC"
 
         cursor.execute(
             f"""
@@ -185,9 +175,10 @@ def opportunities():
     cache_set(cache_key, result)
     return jsonify(result)
 
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     print(f"\n  GovContracts proxy  → http://localhost:{port}")
     print(f"  Health              → http://localhost:{port}/health")
-    print(f"  Mode: PostgreSQL\n")
+    print(f"  Mode: PostgreSQL (Virginia contracts only)\n")
     app.run(debug=True, port=port)

@@ -1,3 +1,7 @@
+"""
+Acquisition Gateway Forecast parser — Virginia contracts, allowed types only.
+"""
+
 import requests
 import json
 import re
@@ -15,58 +19,70 @@ HEADERS = {
     "Referer": "https://acquisitiongateway.gov/",
 }
 
+# ── Allowed contract types ────────────────────────────────────────────────────
+AG_ALLOWED_TYPES = {
+    "acquisition planning",
+    "solicitation issued",
+    "drafting solicitation",
+}
+
+def is_allowed_type_ag(award_status: str | None) -> bool:
+    if not award_status:
+        return False
+    s = award_status.lower().strip()
+    return any(t in s for t in AG_ALLOWED_TYPES)
+
+# ── Virginia matching ─────────────────────────────────────────────────────────
+def is_virginia(place: str | None) -> bool:
+    if not place:
+        return False
+    p = place.strip().upper()
+    return "VIRGINIA" in p or p == "VA" or ", VA" in p or "VA\n" in p
+
+
 def clean_html(text):
-    """Strip HTML tags from a string."""
     if not text:
         return None
     return re.sub(r"<[^>]+>", "", text).strip()
 
+
+def extract_naics_code(raw):
+    if not raw:
+        return None
+    text = clean_html(raw)
+    match = re.search(r'\b\d{6}\b', text)
+    return match.group(0) if match else text.strip() or None
+
+
 def parse_listing(nid, entry):
-    """
-    Maps a single Acquisition Gateway listing to the normalized schema.
-    Uses 'render' for human-readable values, 'values' for clean IDs.
-    """
     render = entry.get("render", {})
     values = entry.get("values", {})
 
-    # Period of performance is a date range — take the start date from values
     pop_start = values.get("field_period_of_performance")
-
-    # Place of performance comes as HTML in render — strip the tags
     place_raw = render.get("field_place_of_performance", "")
-    place = clean_html(place_raw) if isinstance(place_raw, str) else None
+    place     = clean_html(place_raw) if isinstance(place_raw, str) else None
 
     return {
-        "source_site":   "Acquisition Gateway Forecast",
-        "external_id":   str(nid),
-        "title":         values.get("title"),
-        "agency":        render.get("field_result_id"),          # e.g. "General Services Administration"
-        "organization":  render.get("field_organization"),       # e.g. "FAS-Federal Acquisition Service"
-        "naics":         extract_naics_code(render.get("field_naics_code")),         # already a readable label in render — but HTML, so:
-        "description":   clean_html(render.get("body", "")),     # strip <p> tags
-        "award_date":    values.get("field_estimated_award_fy"), # fiscal year e.g. "2026"
-        "deadline":      pop_start,                              # period of performance start date YYYY-MM-DD
-        "contract_value": render.get("field_estimated_contract_v_max"), # e.g. "$1M - $1.9M"
-        "award_status":  render.get("field_award_status"),       # e.g. "Solicitation Issued"
-        "contract_type": render.get("field_contract_type"),      # e.g. "Firm Fixed Price"
-        "acq_strategy":  render.get("field_acquisition_strategy"), # e.g. "Small Business"
-        "place_of_performance": place,                           # e.g. "DC United States"
-        "source_listing_id": values.get("field_source_listing_id"), # e.g. "GLhvHqY4N4ylPky"
-        "url":           f"https://acquisitiongateway.gov/forecast/resources/{nid}",
-        "date_scraped":  datetime.now().strftime("%Y-%m-%d"),
-        "raw_response":  json.dumps(entry),
+        "source_site":          "Acquisition Gateway Forecast",
+        "external_id":          str(nid),
+        "title":                values.get("title"),
+        "agency":               clean_html(render.get("field_result_id")          or ""),
+        "organization":         clean_html(render.get("field_organization")        or ""),
+        "naics":                extract_naics_code(render.get("field_naics_code")),
+        "description":          clean_html(render.get("body",                       "")),
+        "award_date":           values.get("field_estimated_award_fy"),
+        "deadline":             pop_start,
+        "contract_value":       clean_html(render.get("field_estimated_contract_v_max") or ""),
+        "award_status":         clean_html(render.get("field_award_status")        or ""),
+        "contract_type":        clean_html(render.get("field_contract_type")       or ""),
+        "acq_strategy":         clean_html(render.get("field_acquisition_strategy") or ""),
+        "place_of_performance": place,
+        "source_listing_id":    values.get("field_source_listing_id"),
+        "url":                  f"https://acquisitiongateway.gov/forecast/resources/{nid}",
+        "date_scraped":         datetime.now().strftime("%Y-%m-%d"),
+        "raw_response":         json.dumps(entry),
     }
 
-def extract_naics_code(raw):
-    """Pull just the numeric NAICS code from an HTML field."""
-    if not raw:
-        return None
-    # Strip HTML tags first
-    text = clean_html(raw)
-    # NAICS codes are 6 digits — grab the first 6-digit number found
-    import re
-    match = re.search(r'\b\d{6}\b', text)
-    return match.group(0) if match else text.strip() or None
 
 def fetch_page(page_number):
     response = requests.get(
@@ -82,27 +98,26 @@ def fetch_page(page_number):
 
 
 def fetch_and_parse():
-    """Fetch all pages and return normalized postings."""
+    """Fetch all pages, return only Virginia + allowed-type postings."""
     all_postings = []
     page = 1
 
-    # Get page 1 to find total count
     data, listings = fetch_page(page)
     if data is None:
         return []
 
     listing_meta = data.get("listing", {})
-    total = int(listing_meta.get("total") or 0)
-    page_size = 25
-    total_pages = -(-total // page_size)
+    total        = int(listing_meta.get("total") or 0)
+    page_size    = 25
+    total_pages  = -(-total // page_size)
     print(f"Total listings: {total} across ~{total_pages} pages")
 
     while True:
         if listings is None or len(listings) == 0:
-            print(f"No listings on page {page} — stopping.")
+            print(f"\nNo listings on page {page} — stopping.")
             break
 
-        print(f"Page {page}/{total_pages} — {len(listings)} listings")
+        print(f"Page {page}/{total_pages} — {len(listings)} listings", end="\r")
 
         for nid, entry in listings.items():
             try:
@@ -113,11 +128,21 @@ def fetch_and_parse():
                 continue
 
         if page >= total_pages:
-            print("Reached last page.")
+            print(f"\nReached last page.")
             break
 
         page += 1
         time.sleep(0.2)
         _, listings = fetch_page(page)
+
+    # Virginia filter
+    before = len(all_postings)
+    all_postings = [p for p in all_postings if is_virginia(p.get("place_of_performance"))]
+    print(f"  [acq_gateway] Virginia filter: {before:,} → {len(all_postings):,} records.")
+
+    # Contract type filter
+    before = len(all_postings)
+    all_postings = [p for p in all_postings if is_allowed_type_ag(p.get("award_status"))]
+    print(f"  [acq_gateway] Type filter: {before:,} → {len(all_postings):,} records.")
 
     return all_postings

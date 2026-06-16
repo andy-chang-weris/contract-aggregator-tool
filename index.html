@@ -434,17 +434,17 @@
         <div class="feedback-row">
           <button class="feedback-btn positive"
                   onclick="sendFeedback(${Number(c.id) || 0}, 'highly_relevant', this)">
-            Good match
+            <i class="ti ti-thumb-up" aria-hidden="true"></i> Good match
           </button>
 
           <button class="feedback-btn positive"
                   onclick="sendFeedback(${Number(c.id) || 0}, 'saved', this)">
-            Save
+            <i class="ti ti-bookmark" aria-hidden="true"></i> Save
           </button>
 
           <button class="feedback-btn negative"
                   onclick="sendFeedback(${Number(c.id) || 0}, 'not_interested', this)">
-            Not interested
+            <i class="ti ti-thumb-down" aria-hidden="true"></i> Not interested
           </button>
         </div>
       </div>`;

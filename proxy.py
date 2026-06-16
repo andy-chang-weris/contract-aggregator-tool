@@ -10,10 +10,9 @@ import psycopg2
 import psycopg2.extras
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-
 from uuid import UUID
-
 from preference_training import train_client_preferences
+from relevance_ranking import rank_postings
 
 try:
     from dotenv import load_dotenv
@@ -534,6 +533,95 @@ def train_preferences_endpoint(client_id):
     except Exception as e:
         return jsonify({"error": f"Training error: {str(e)}"}), 500
 
+@app.route("/api/clients/<client_id>/ranked-opportunities")
+def ranked_opportunities(client_id):
+    try:
+        client_id = parse_uuid(client_id, "client_id")
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    limit  = max(1, min(int(request.args.get("limit", 20)), 1000))
+    offset = max(0, int(request.args.get("offset", 0)))
+    candidate_limit = max(1, min(int(request.args.get("candidateLimit", 1000)), 5000))
+    exclude_negative = parse_bool(request.args.get("excludeNegativeFeedback"), default=False)
+
+    agency        = (request.args.get("agency")       or "").strip()
+    naics_raw     = request.args.get("naics")         or ""
+    naics_list    = [n.strip() for n in naics_raw.split(",") if n.strip()]
+    contract_type = (request.args.get("contractType") or "").strip()
+    source        = (request.args.get("source")       or "").strip()
+
+    conditions, params = [], []
+    if agency:
+        conditions.append("agency ILIKE %s"); params.append(f"%{agency}%")
+    if naics_list:
+        placeholders = ",".join(["%s"] * len(naics_list))
+        conditions.append(f"naics IN ({placeholders})"); params.extend(naics_list)
+    if contract_type:
+        conditions.append("award_status ILIKE %s"); params.append(f"%{contract_type}%")
+    if source:
+        conditions.append("source_site = %s"); params.append(source)
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
+    try:
+        conn   = get_db()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        # Verify client exists
+        cursor.execute("SELECT id FROM clients WHERE id = %s", (client_id,))
+        if not cursor.fetchone():
+            cursor.close(); conn.close()
+            return jsonify({"error": "client_id does not exist"}), 404
+
+        # Load preferences (may be empty defaults)
+        cursor.execute("SELECT * FROM client_preferences WHERE client_id = %s", (client_id,))
+        prefs = dict(cursor.fetchone() or {})
+
+        # Optionally exclude postings the client already rejected
+        excluded_ids = set()
+        if exclude_negative:
+            cursor.execute("""
+                SELECT DISTINCT posting_id
+                FROM client_feedback
+                WHERE client_id = %s
+                  AND posting_id IS NOT NULL
+                  AND action IN ('not_interested', 'dismissed')
+            """, (client_id,))
+            excluded_ids = {r["posting_id"] for r in cursor.fetchall()}
+
+        cursor.execute(f"""
+            SELECT
+                id, source_site, external_id, title, agency, organization,
+                naics, description, posted_date, deadline, award_date,
+                contract_value, award_status, contract_type, acq_strategy,
+                place_of_performance, url, date_scraped
+            FROM postings
+            {where}
+            ORDER BY date_scraped DESC
+            LIMIT %s
+        """, params + [candidate_limit])
+        candidates = [dict(r) for r in cursor.fetchall()]
+        cursor.close(); conn.close()
+
+    except Exception as e:
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
+
+    if excluded_ids:
+        candidates = [c for c in candidates if c.get("id") not in excluded_ids]
+
+    ranked = rank_postings(candidates, prefs)
+    total  = len(ranked)
+    page   = ranked[offset: offset + limit]
+
+    return jsonify({
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "opportunities": page,
+        "mode": "database",
+        "ranked": True,
+        "cached": False,
+    })
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

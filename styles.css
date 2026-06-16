@@ -793,6 +793,9 @@ a.chip.active:hover {
   color: var(--text2);
   cursor: pointer;
   transition: all .15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .feedback-btn:hover {
@@ -815,4 +818,65 @@ a.chip.active:hover {
   opacity: .55;
   cursor: not-allowed;
   transform: none;
+}
+
+/* ── Relevance ranking UI ─────────────────────────────────── */
+
+/* Wrapper for score pill + type badge in the card header */
+.card-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* "85% match" pill — filled teal to stand out from type badges */
+.score-pill {
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+  letter-spacing: .03em;
+  background: var(--teal);
+  color: var(--navy-dark);
+  border: 1px solid var(--teal-dark);
+}
+
+/* "Why ranked:" row beneath the card meta */
+.relevance-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+
+.reason-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-right: 2px;
+}
+
+/* Individual reason chip, e.g. "Preferred NAICS 541611 (+20.0)" */
+.reason-chip {
+  font-size: 11px;
+  font-family: var(--mono);
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--surface2);
+  color: var(--text2);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.reason-chip strong {
+  color: var(--navy);
+  font-weight: 700;
 }

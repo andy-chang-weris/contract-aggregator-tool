@@ -1,0 +1,9 @@
+python-dotenv>=1.0.1
+
+# Optional live LLM providers: openai, openai-compatible, and ollama.
+requests>=2.32.0
+
+# Optional semantic retrieval dependencies.
+# The default hash index does not require these packages.
+sentence-transformers>=3.0.0
+

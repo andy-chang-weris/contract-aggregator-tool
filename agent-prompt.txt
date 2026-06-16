@@ -1,0 +1,92 @@
+## Mission
+
+Build an isolated terminal-based RAG assistant for government contract opportunities in this repository.
+
+The assistant must let a user chat from the terminal, ask questions about contracts, and get grounded recommendations from the existing PostgreSQL `postings` data. Website chatbot integration comes later.
+
+## Hard scope rules
+
+- Create or modify files only inside this `/agent` directory.
+- Read files outside `/agent` only for context, especially `../db.py`, `../proxy.py`, `../requirements.txt`, and `../sources/*`.
+- Never edit, rename, delete, format, or regenerate files outside `/agent`.
+- Do not change the database schema, run migrations, or write to application tables.
+- Keep generated indexes, caches, mock data, config examples, and docs inside `/agent`.
+- Do not commit secrets, API keys, credentials, database dumps, or large model artifacts.
+
+## Cloud-first execution
+
+- Assume development, running, and validation happen in a Codex cloud environment, not on the user's local computer.
+- Do not require a local GPU or a multi-GB local model download for default setup, tests, or smoke tests.
+- Real LLM generation should use a configurable remote/cloud inference provider for an open-source instruct model when available.
+- Keep local inference optional, not mandatory. Ollama, llama.cpp, vLLM, or Transformers support is welcome only if it does not break cloud testing.
+- Expose provider settings through environment variables such as `RAG_LLM_PROVIDER`, `RAG_LLM_MODEL`, `RAG_LLM_BASE_URL`, and `RAG_LLM_API_KEY`.
+- Tests must pass with a mock LLM and sample data when no database, API key, GPU, or model server is available.
+- Add an optional live smoke-test command that uses the configured cloud LLM provider and skips gracefully when required env vars are missing.
+- Document the Codex/cloud setup steps in `/agent/README.md`, including dependency installation, env vars, and any required network access.
+
+## Existing app context
+
+- Contract records live in PostgreSQL table `postings`.
+- Use the app's existing database env vars: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`.
+- Relevant fields include `id`, `source_site`, `external_id`, `url`, `agency`, `naics`, `posted_date`, `contract_type`, `place_of_performance`, `title`, `organization`, `description`, `deadline`, `award_date`, `contract_value`, `award_status`, `acq_strategy`, `source_listing_id`, `date_scraped`, and `raw_response`.
+- Build a read-only DB layer inside `/agent`; do not import or modify the Flask API.
+
+## Suggested structure
+
+Keep the component modular so it can later become a website chatbot backend.
+
+```text
+/agent
+  README.md
+  requirements.txt
+  chat.py          # terminal entrypoint
+  config.py        # env vars and defaults
+  db.py            # read-only contract loader
+  documents.py     # record formatting/chunking
+  index.py         # build/rebuild vector index
+  retriever.py     # semantic search
+  llm.py           # mock + remote/cloud + optional local providers
+  prompts.py       # grounded answer prompts
+  rag_agent.py     # orchestration
+  smoke_test.py or tests/
+```
+
+## RAG stack guidance
+
+- Prefer a simple, reliable stack: `sentence-transformers` embeddings plus ChromaDB or FAISS.
+- Use cloud-friendly embedding defaults such as `BAAI/bge-small-en-v1.5` or another lightweight CPU-compatible embedding model.
+- For generation, support strong open-source instruct models through a provider abstraction. Good model families include Qwen, Llama, Mistral, and Mixtral.
+- Avoid heavyweight frameworks unless they clearly reduce code and setup complexity.
+- Store the vector index under `/agent/.rag_index/` or `/agent/data/`.
+- Provide a tiny mock/sample-data path so retrieval and terminal chat can run without PostgreSQL.
+
+## RAG behavior
+
+- Index full contract records plus metadata, not description text alone.
+- Preserve source metadata in retrieved results: database id, title, agency, source site, URL, dates, value, status, NAICS, and place of performance when available.
+- Support direct Q&A and preference matching, for example: “find contracts for small AI/cloud vendors.”
+- Ground answers in retrieved records and include contract titles/IDs plus URLs when available.
+- If evidence is weak or no relevant contract is found, say so and suggest narrower search terms.
+- Never invent contracts, deadlines, values, agencies, eligibility details, or URLs.
+
+## Work process
+
+1. Inspect `/agent` and read relevant root files for schema/context.
+2. Briefly plan before coding.
+3. Implement only inside `/agent`.
+4. Add setup docs and smoke tests.
+5. Run the most relevant checks in the Codex/cloud environment.
+6. If a check cannot run because of missing DB, model, network, or credentials, document the exact blocker and verify the mock path.
+
+Subagents are optional. Use them only if the environment supports them and they help with research, implementation review, or test review; otherwise proceed independently.
+
+## Done when
+
+- `cd agent && python chat.py` starts an interactive terminal chat or prints clear setup guidance.
+- There is a documented command to build or rebuild the vector index.
+- Retrieval works against PostgreSQL data or the mock dataset.
+- Mock tests pass in Codex without a DB, GPU, API key, or model server.
+- An optional live cloud-LLM smoke test is documented and works when provider env vars are configured.
+- Answers are grounded in retrieved contract metadata.
+- `/agent/README.md` explains setup, cloud/Codex usage, env vars, commands, provider choices, limitations, and the later path to website chatbot integration.
+

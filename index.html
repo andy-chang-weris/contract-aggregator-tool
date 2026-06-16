@@ -27,7 +27,7 @@
         <span id="status-label">Proxy not checked</span>
       </div>
       <input type="text" class="proxy-url-input" id="proxy-url"
-        value="http://localhost:5000"
+        value="https://web-production-b51e1.up.railway.app"
         title="URL of your running proxy.py server">
       <button class="check-btn" onclick="checkProxy()">
         <i class="ti ti-plug" aria-hidden="true"></i> Check proxy
@@ -223,7 +223,7 @@
       ? '<i class="ti ti-arrow-down" aria-hidden="true"></i>'
       : '<i class="ti ti-arrow-up" aria-hidden="true"></i>';
     dirBtn.title = sortDir === 'desc' ? 'Descending — click to toggle' : 'Ascending — click to toggle';
-    dirBtn.style.display = sortField === 'default' ? 'none' : 'flex';
+    dirBtn.style.display = (sortField === 'default' || sortField === 'relevance') ? 'none' : 'flex';
   }
 
   function onSortChange() {
@@ -265,6 +265,34 @@
     return String(str || '')
       .replace(/&/g,'&amp;').replace(/</g,'&lt;')
       .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+
+  function hasRelevanceScore(c) {
+    return c && c.relevance_score !== undefined && c.relevance_score !== null && !isNaN(Number(c.relevance_score));
+  }
+
+  function renderRelevanceScore(c) {
+    if (!hasRelevanceScore(c)) return '';
+    const score = Math.round(Number(c.relevance_score));
+    return `<span class="score-pill" title="Client relevance score">${score}% match</span>`;
+  }
+
+  function renderRelevanceReasons(c) {
+    if (!Array.isArray(c.relevance_reasons) || c.relevance_reasons.length === 0) return '';
+    const chips = c.relevance_reasons
+      .slice(0, 4)
+      .map(reason => {
+        if (typeof reason === 'string') {
+          return `<span class="reason-chip">${escHtml(reason)}</span>`;
+        }
+        const label = escHtml(reason.label || 'Preference match');
+        const points = Number(reason.points || 0);
+        const prefix = points > 0 ? '+' : '';
+        return `<span class="reason-chip">${label} <strong>${prefix}${points.toFixed(1)}</strong></span>`;
+      })
+      .join('');
+    return `<div class="relevance-reasons"><span class="reason-label">Why ranked:</span>${chips}</div>`;
   }
 
   function trainPreferencesInBackground() {
@@ -364,7 +392,10 @@
       <div class="card">
         <div class="card-top">
           <div class="card-title">${escHtml(c.title || '—')}</div>
-          <span class="type-badge ${badgeClass(status)}">${escHtml(status)}</span>
+          <div class="card-badges">
+            ${renderRelevanceScore(c)}
+            <span class="type-badge ${badgeClass(status)}">${escHtml(status)}</span>
+          </div>
         </div>
         <div class="card-meta">
           <span class="meta-item">
@@ -398,6 +429,7 @@
                </a>`
             : ''}
         </div>
+        ${renderRelevanceReasons(c)}
 
         <div class="feedback-row">
           <button class="feedback-btn positive"
@@ -434,11 +466,24 @@
     if (ptype)                   params.set('contractType', ptype);
     if (org)                     params.set('agency', org);
     if (selectedNaics.size > 0)  params.set('naics', [...selectedNaics].join(','));
-    if (sortField !== 'default') params.set('sortBy', sortField);
-    params.set('sortDir', sortDir);
+
+    let endpoint = `${base}/api/opportunities`;
+    if (sortField === 'relevance') {
+      if (!CLIENT_ID) {
+        mainEl.innerHTML = `<div class="error-panel"><strong><i class="ti ti-alert-circle"></i> Error:</strong> Missing client_id for relevance ranking.</div>`;
+        btn.disabled = false;
+        return;
+      }
+      endpoint = `${base}/api/clients/${CLIENT_ID}/ranked-opportunities`;
+      params.set('candidateLimit', 1000);
+      params.set('excludeNegativeFeedback', 'true');
+    } else if (sortField !== 'default') {
+      params.set('sortBy', sortField);
+      params.set('sortDir', sortDir);
+    }
 
     try {
-      const res = await fetch(`${base}/api/opportunities?${params}`, {
+      const res = await fetch(`${endpoint}?${params}`, {
         signal: AbortSignal.timeout(30000)
       });
 
@@ -472,17 +517,19 @@
     const page    = Math.floor(offset / PAGE_SIZE) + 1;
     const maxPage = Math.ceil(total / PAGE_SIZE);
     const showing = Math.min(offset + PAGE_SIZE, total);
+    const showingStart = total === 0 ? 0 : offset + 1;
 
     let html = `
       <div class="results-header">
         <p class="results-count">
-          <strong>${total.toLocaleString()}</strong> contract${total !== 1 ? 's' : ''} found
-          &nbsp;·&nbsp; showing ${offset + 1}–${showing}
+          <strong>${total.toLocaleString()}</strong> contract${total !== 1 ? 's' : ''} found${sortField === 'relevance' ? ' · ranked for client' : ''}
+          &nbsp;·&nbsp; showing ${showingStart}–${showing}
         </p>
         <div class="sort-controls">
           <span class="sort-label">Sort by</span>
           <select class="sort-select" id="sort-select" onchange="onSortChange()">
             <option value="default">Default</option>
+            <option value="relevance">Best match</option>
             <option value="posted_date">Date posted</option>
           </select>
           <button class="sort-dir-btn" id="sort-dir-btn" onclick="toggleSortDir()" title="Toggle sort direction" style="display:none">

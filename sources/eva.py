@@ -69,6 +69,24 @@ def clean(value: Any) -> str:
     return SPACE_RE.sub(" ", text).strip()
 
 
+def clean_code_list(value: Any) -> str:
+    """
+    Normalize a multi-valued code field (eVA commcode) into a
+    deduplicated, order-preserving string. Solr returns commcode as
+    multi-valued, so repeated line-item codes get duplicated
+    (e.g. '7719; 7719; 7719; ...'). This collapses them to '7719'
+    while preserving any genuinely distinct codes.
+    """
+    if isinstance(value, (list, tuple)):
+        seen: list[str] = []
+        for v in value:
+            c = clean(v)
+            if c and c not in seen:
+                seen.append(c)
+        return "; ".join(seen)
+    return clean(value)
+
+
 def parse_date(value: Any) -> str | None:
     """
     Convert eVA date strings to YYYY-MM-DD.
@@ -228,7 +246,7 @@ def normalize_doc(doc: dict, target_url: str) -> dict:
 
         # Filter columns
         "agency":               clean(doc.get("agencyname")) or None,
-        "naics":                clean(doc.get("commcode")) or None,
+        "naics":                clean_code_list(doc.get("commcode")) or None,
         "posted_date":          parse_date(doc.get("pubdate")),
         "contract_type":        None,   # eVA doesn't have a direct contract type
         "place_of_performance": clean(doc.get("workloc")) or "Virginia",

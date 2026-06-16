@@ -122,7 +122,155 @@ def setup_database():
     conn.commit()
     cursor.close()
     conn.close()
+    setup_ml_tables()
     print("  [db] Database ready.")
+
+def setup_ml_tables():
+    """
+    Creates MVP client preference and feedback tables.
+    Safe to run repeatedly.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS clients (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            name TEXT NOT NULL,
+            organization TEXT,
+            contact_email TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS client_preferences (
+            client_id uuid PRIMARY KEY REFERENCES clients(id) ON DELETE CASCADE,
+
+            preferred_naics TEXT[] NOT NULL DEFAULT '{}',
+            excluded_naics TEXT[] NOT NULL DEFAULT '{}',
+
+            preferred_agencies TEXT[] NOT NULL DEFAULT '{}',
+            excluded_agencies TEXT[] NOT NULL DEFAULT '{}',
+
+            preferred_sources TEXT[] NOT NULL DEFAULT '{}',
+            excluded_sources TEXT[] NOT NULL DEFAULT '{}',
+
+            preferred_keywords TEXT[] NOT NULL DEFAULT '{}',
+            disliked_keywords TEXT[] NOT NULL DEFAULT '{}',
+
+            preferred_contract_types TEXT[] NOT NULL DEFAULT '{}',
+            preferred_set_asides TEXT[] NOT NULL DEFAULT '{}',
+
+            min_contract_value NUMERIC,
+            max_contract_value NUMERIC,
+            max_days_until_deadline INTEGER,
+
+            naics_weights JSONB NOT NULL DEFAULT '{}'::jsonb,
+            agency_weights JSONB NOT NULL DEFAULT '{}'::jsonb,
+            keyword_weights JSONB NOT NULL DEFAULT '{}'::jsonb,
+            source_weights JSONB NOT NULL DEFAULT '{}'::jsonb,
+
+            profile_summary TEXT,
+            last_trained_at TIMESTAMPTZ,
+
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS client_feedback (
+            id BIGSERIAL PRIMARY KEY,
+            client_id uuid NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+            posting_id INTEGER REFERENCES postings(id) ON DELETE SET NULL,
+            posting_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
+
+            action TEXT NOT NULL CHECK (
+                action IN (
+                    'viewed',
+                    'clicked',
+                    'saved',
+                    'not_interested',
+                    'highly_relevant',
+                    'applied',
+                    'dismissed'
+                )
+            ),
+
+            rating SMALLINT CHECK (rating BETWEEN 1 AND 5),
+            notes TEXT,
+            feedback_source TEXT NOT NULL DEFAULT 'web_app',
+            metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+    """)
+
+    # Safe migrations for installs that created client_feedback earlier.
+    cursor.execute("""
+        ALTER TABLE client_feedback
+        ADD COLUMN IF NOT EXISTS posting_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb
+    """)
+
+    cursor.execute("""
+        ALTER TABLE client_feedback
+        ALTER COLUMN posting_id DROP NOT NULL
+    """)
+
+    cursor.execute("""
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1
+                FROM pg_constraint
+                WHERE conrelid = 'client_feedback'::regclass
+                AND conname = 'client_feedback_posting_id_fkey'
+            ) THEN
+                ALTER TABLE client_feedback
+                DROP CONSTRAINT client_feedback_posting_id_fkey;
+            END IF;
+
+            ALTER TABLE client_feedback
+            ADD CONSTRAINT client_feedback_posting_id_fkey
+            FOREIGN KEY (posting_id)
+            REFERENCES postings(id)
+            ON DELETE SET NULL;
+        END $$;
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_client_feedback_client_time
+        ON client_feedback(client_id, created_at DESC)
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_client_feedback_posting
+        ON client_feedback(posting_id)
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_client_feedback_action
+        ON client_feedback(action)
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_client_preferences_naics
+        ON client_preferences USING gin(preferred_naics)
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_client_preferences_keywords
+        ON client_preferences USING gin(preferred_keywords)
+    """)
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+    print("  [db] ML preference/feedback tables ready.")
 
 
 # ── Deduplication ─────────────────────────────────────────────────────────────

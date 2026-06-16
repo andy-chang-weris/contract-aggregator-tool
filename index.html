@@ -27,7 +27,7 @@
         <span id="status-label">Proxy not checked</span>
       </div>
       <input type="text" class="proxy-url-input" id="proxy-url"
-        value="https://web-production-b51e1.up.railway.app"
+        value="http://localhost:5000"
         title="URL of your running proxy.py server">
       <button class="check-btn" onclick="checkProxy()">
         <i class="ti ti-plug" aria-hidden="true"></i> Check proxy
@@ -148,6 +148,18 @@
   let sortField      = 'default';
   let sortDir        = 'desc';
   const PAGE_SIZE    = 20;
+  const AUTO_TRAIN_AFTER_FEEDBACK = true;
+
+  const DEFAULT_CLIENT_ID = '9f68f2aa-fc61-496f-81ed-b89ee5a92cdf';
+
+  const CLIENT_ID =
+    new URLSearchParams(window.location.search).get('client_id') ||
+    localStorage.getItem('client_id') ||
+    DEFAULT_CLIENT_ID;
+
+  if (CLIENT_ID) {
+    localStorage.setItem('client_id', CLIENT_ID);
+  }
 
   /* ── NAICS toggle ─────────────────────────────────────────── */
   document.querySelectorAll('.naics-tag').forEach(tag => {
@@ -255,6 +267,90 @@
       .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
+  function trainPreferencesInBackground() {
+    if (!AUTO_TRAIN_AFTER_FEEDBACK || !CLIENT_ID) return;
+
+    const base = document.getElementById('proxy-url').value.trim();
+    fetch(`${base}/api/clients/${CLIENT_ID}/train-preferences`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        min_feedback_events: 1,
+        include_clicks: true,
+        positive_threshold: 1.0,
+        negative_threshold: -2.0
+      })
+    }).catch(err => {
+      console.warn('Preference training failed:', err);
+    });
+  }
+
+  async function sendFeedback(postingId, action, button = null, extra = {}) {
+    const base = document.getElementById('proxy-url').value.trim();
+
+    if (!CLIENT_ID) {
+      alert('Missing client_id. Add ?client_id=<uuid> to the URL or set DEFAULT_CLIENT_ID in index.html.');
+      return;
+    }
+
+    if (!postingId) {
+      console.warn('Missing posting id for feedback action:', action);
+      return;
+    }
+
+    const originalText = button ? button.innerHTML : null;
+
+    if (button) {
+      button.disabled = true;
+      button.innerHTML = 'Saving...';
+    }
+
+    try {
+      const res = await fetch(`${base}/api/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: CLIENT_ID,
+          posting_id: postingId,
+          action,
+          feedback_source: 'web_app',
+          metadata: extra
+        })
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+
+      trainPreferencesInBackground();
+
+      if (button) {
+        button.innerHTML = 'Saved';
+        setTimeout(() => {
+          button.innerHTML = originalText;
+          button.disabled = false;
+        }, 1200);
+      }
+
+      if (action === 'not_interested' || action === 'dismissed') {
+        currentItems = currentItems.filter(item => Number(item.id) !== Number(postingId));
+        renderResults(currentItems, currentTotal, currentOffset);
+      }
+
+    } catch (err) {
+      console.error('Feedback failed:', err);
+
+      if (button) {
+        button.innerHTML = originalText;
+        button.disabled = false;
+      }
+
+      alert(`Could not save feedback: ${err.message}`);
+    }
+  }
+
   /* ── Render card ──────────────────────────────────────────── */
   function renderCard(c) {
     const soon    = isDeadlineSoon(c.deadline);
@@ -292,7 +388,32 @@
             NAICS ${escHtml(c.naics || c.naicsCode || '—')}
           </span>
           <span class="source-pill">${escHtml(c.source_site || c.source || '—')}</span>
-          ${(c.url || c.link) ? `<a href="${escHtml(c.url || c.link)}" target="_blank" class="view-link"><i class="ti ti-external-link" aria-hidden="true"></i>View posting</a>` : ''}
+          ${(c.url || c.link)
+            ? `<a href="${escHtml(c.url || c.link)}"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="view-link"
+                  onclick="sendFeedback(${Number(c.id) || 0}, 'clicked', null, { url: this.href })">
+                  <i class="ti ti-external-link" aria-hidden="true"></i>View posting
+               </a>`
+            : ''}
+        </div>
+
+        <div class="feedback-row">
+          <button class="feedback-btn positive"
+                  onclick="sendFeedback(${Number(c.id) || 0}, 'highly_relevant', this)">
+            Good match
+          </button>
+
+          <button class="feedback-btn positive"
+                  onclick="sendFeedback(${Number(c.id) || 0}, 'saved', this)">
+            Save
+          </button>
+
+          <button class="feedback-btn negative"
+                  onclick="sendFeedback(${Number(c.id) || 0}, 'not_interested', this)">
+            Not interested
+          </button>
         </div>
       </div>`;
   }

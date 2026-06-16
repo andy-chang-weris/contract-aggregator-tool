@@ -772,3 +772,47 @@ a.chip.active:hover {
   opacity: .65;
   margin-left: 1px;
 }
+
+.feedback-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.feedback-btn {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text2);
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.feedback-btn:hover {
+  transform: translateY(-1px);
+}
+
+.feedback-btn.positive:hover {
+  background: var(--teal-light);
+  border-color: var(--success-bd);
+  color: var(--teal-dark);
+}
+
+.feedback-btn.negative:hover {
+  background: var(--danger-bg);
+  border-color: var(--danger-bd);
+  color: var(--danger);
+}
+
+.feedback-btn:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+  transform: none;
+}

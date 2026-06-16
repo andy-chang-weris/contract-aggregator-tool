@@ -1,0 +1,4 @@
+aws_region   = "us-east-1"
+github_owner = "wincvh"
+github_repo  = "agent"
+bucket_name  = "agent-ci-logs-yourname"

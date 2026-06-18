@@ -38,22 +38,15 @@
   <!-- Sidebar -->
   <aside>
 
-    <div>
-      <p class="section-label">Data sources</p>
-      <div class="source-chips">
-        <a class="chip active" href="https://sam.gov/opportunities" target="_blank" rel="noopener noreferrer" title="Open SAM.gov in new tab">
-          <i class="ti ti-building-community" aria-hidden="true" style="font-size:13px"></i> SAM.gov
-          <i class="ti ti-external-link chip-ext" aria-hidden="true"></i>
-        </a>
-        <a class="chip active" href="https://acquisitiongateway.gov/forecast" target="_blank" rel="noopener noreferrer" title="Open Acquisition Gateway Forecast in new tab">
-          <i class="ti ti-chart-bar" aria-hidden="true" style="font-size:13px"></i> Acq. Gateway
-          <i class="ti ti-external-link chip-ext" aria-hidden="true"></i>
-        </a>
-        <a class="chip active" href="https://eva.virginia.gov/" target="_blank" rel="noopener noreferrer" title="Open eVA in new tab">
-          <i class="ti ti-road" aria-hidden="true" style="font-size:13px"></i> eVA
-          <i class="ti ti-external-link chip-ext" aria-hidden="true"></i>
-        </a>
-      </div>
+    <!-- Source filter -->
+    <div class="field">
+      <label for="f-source">Data source</label>
+      <select id="f-source">
+        <option value="">All sources</option>
+        <option value="SAM.gov">SAM.gov</option>
+        <option value="Acquisition Gateway Forecast">Acquisition Gateway</option>
+        <option value="Virginia eVA">Virginia eVA</option>
+      </select>
     </div>
 
     <div class="divider"></div>
@@ -145,7 +138,7 @@
   let currentItems   = [];
   let currentTotal   = 0;
   let currentOffset  = 0;
-  let sortField      = 'default';
+  let sortField      = 'posted_date';
   let sortDir        = 'desc';
   const PAGE_SIZE    = 20;
   const AUTO_TRAIN_AFTER_FEEDBACK = true;
@@ -177,8 +170,9 @@
 
   /* ── Clear filters ────────────────────────────────────────── */
   function clearFilters() {
-    document.getElementById('f-ptype').value = '';
-    document.getElementById('f-org').value   = '';
+    document.getElementById('f-source').value = '';
+    document.getElementById('f-ptype').value  = '';
+    document.getElementById('f-org').value    = '';
     selectedNaics.clear();
     document.querySelectorAll('.naics-tag.selected').forEach(t => t.classList.remove('selected'));
   }
@@ -223,7 +217,7 @@
       ? '<i class="ti ti-arrow-down" aria-hidden="true"></i>'
       : '<i class="ti ti-arrow-up" aria-hidden="true"></i>';
     dirBtn.title = sortDir === 'desc' ? 'Descending — click to toggle' : 'Ascending — click to toggle';
-    dirBtn.style.display = (sortField === 'default' || sortField === 'relevance') ? 'none' : 'flex';
+    dirBtn.style.display = sortField === 'relevance' ? 'none' : 'flex';
   }
 
   function onSortChange() {
@@ -266,7 +260,6 @@
       .replace(/&/g,'&amp;').replace(/</g,'&lt;')
       .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
-
 
   function hasRelevanceScore(c) {
     return c && c.relevance_score !== undefined && c.relevance_score !== null && !isNaN(Number(c.relevance_score));
@@ -456,6 +449,7 @@
     const base     = document.getElementById('proxy-url').value.trim();
     const btn      = document.getElementById('run-btn');
     const mainEl   = document.getElementById('main-content');
+    const source   = document.getElementById('f-source').value;
     const ptype    = document.getElementById('f-ptype').value;
     const org      = document.getElementById('f-org').value;
 
@@ -463,6 +457,7 @@
     mainEl.innerHTML = `<div class="state-panel"><div class="spinner"></div><p>Fetching contracts…</p></div>`;
 
     const params = new URLSearchParams({ limit: PAGE_SIZE, offset });
+    if (source)                  params.set('source', source);
     if (ptype)                   params.set('contractType', ptype);
     if (org)                     params.set('agency', org);
     if (selectedNaics.size > 0)  params.set('naics', [...selectedNaics].join(','));
@@ -477,7 +472,7 @@
       endpoint = `${base}/api/clients/${CLIENT_ID}/ranked-opportunities`;
       params.set('candidateLimit', 1000);
       params.set('excludeNegativeFeedback', 'true');
-    } else if (sortField !== 'default') {
+    } else {
       params.set('sortBy', sortField);
       params.set('sortDir', sortDir);
     }
@@ -528,11 +523,10 @@
         <div class="sort-controls">
           <span class="sort-label">Sort by</span>
           <select class="sort-select" id="sort-select" onchange="onSortChange()">
-            <option value="default">Default</option>
-            <option value="relevance">Best match</option>
             <option value="posted_date">Date posted</option>
+            <option value="relevance">Best match</option>
           </select>
-          <button class="sort-dir-btn" id="sort-dir-btn" onclick="toggleSortDir()" title="Toggle sort direction" style="display:none">
+          <button class="sort-dir-btn" id="sort-dir-btn" onclick="toggleSortDir()" title="Toggle sort direction">
             <i class="ti ti-arrow-down" aria-hidden="true"></i>
           </button>
         </div>

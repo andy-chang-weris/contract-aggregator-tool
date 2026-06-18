@@ -5,7 +5,7 @@ Acquisition Gateway Forecast parser — Virginia contracts, allowed types only.
 import requests
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 import time
 
 BASE_URL = "https://ag-dashboard.acquisitiongateway.gov/api/v3.0/resources/forecast"
@@ -32,12 +32,23 @@ def is_allowed_type_ag(award_status: str | None) -> bool:
     s = award_status.lower().strip()
     return any(t in s for t in AG_ALLOWED_TYPES)
 
+def parse_unix_date(value):
+    if not value:
+        return None
+    try:
+        return datetime.fromtimestamp(int(value), tz=timezone.utc).strftime("%Y-%m-%d")
+    except (ValueError, TypeError, OSError):
+        return None
+
 # ── Virginia matching ─────────────────────────────────────────────────────────
 def is_virginia(place: str | None) -> bool:
     if not place:
         return False
     p = place.strip().upper()
-    return "VIRGINIA" in p or p == "VA" or ", VA" in p or "VA\n" in p
+    return (
+        "VIRGINIA" in p
+        or re.search(r'\bVA\b', p) is not None
+    )
 
 
 def clean_html(text):
@@ -58,27 +69,31 @@ def parse_listing(nid, entry):
     render = entry.get("render", {})
     values = entry.get("values", {})
 
-    pop_start = values.get("field_period_of_performance")
     place_raw = render.get("field_place_of_performance", "")
     place     = clean_html(place_raw) if isinstance(place_raw, str) else None
+
+    period_of_performance = values.get("field_period_of_performance")
+    if period_of_performance and period_of_performance[:4] == "2099":
+        period_of_performance = None
 
     return {
         "source_site":          "Acquisition Gateway Forecast",
         "external_id":          str(nid),
         "title":                values.get("title"),
-        "agency":               clean_html(render.get("field_result_id")          or ""),
-        "organization":         clean_html(render.get("field_organization")        or ""),
+        "agency":               clean_html(render.get("field_result_id")           or ""),
+        "organization":         clean_html(render.get("field_organization")         or ""),
         "naics":                extract_naics_code(render.get("field_naics_code")),
-        "description":          clean_html(render.get("body",                       "")),
+        "description":          clean_html(render.get("body",                        "")),
         "award_date":           values.get("field_estimated_award_fy"),
-        "deadline":             pop_start,
+        "deadline":             period_of_performance,
         "contract_value":       clean_html(render.get("field_estimated_contract_v_max") or ""),
-        "award_status":         clean_html(render.get("field_award_status")        or ""),
-        "contract_type":        clean_html(render.get("field_contract_type")       or ""),
+        "award_status":         clean_html(render.get("field_award_status")         or ""),
+        "contract_type":        clean_html(render.get("field_contract_type")        or ""),
         "acq_strategy":         clean_html(render.get("field_acquisition_strategy") or ""),
         "place_of_performance": place,
         "source_listing_id":    values.get("field_source_listing_id"),
         "url":                  f"https://acquisitiongateway.gov/forecast/resources/{nid}",
+        "posted_date":          parse_unix_date(values.get("created")),
         "date_scraped":         datetime.now().strftime("%Y-%m-%d"),
         "raw_response":         json.dumps(entry),
     }
@@ -128,7 +143,7 @@ def fetch_and_parse():
                 continue
 
         if page >= total_pages:
-            print(f"\nReached last page.")
+            print(f"\nStopping at page {page}.")
             break
 
         page += 1

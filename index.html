@@ -8,6 +8,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@700&family=Lato:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="chat-panel.css">
+
 </head>
 <body>
 
@@ -152,6 +154,7 @@
       <p>Set your filters and click <strong>Search contracts</strong></p>
       <small>Make sure <code>proxy.py</code> is running, then click <strong>Check proxy</strong> in the top bar.</small>
     </div>
+    <section id="chat-panel-root" class="chat-panel-root"></section>
   </main>
 
 </div>
@@ -633,6 +636,35 @@
     updateSortUI();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
+</script>
+<script type="module">
+  import { mountContractChatPanel } from './chat-panel.js';
+
+  let chatPanel;
+
+  function ensureChatPanel() {
+    let root = document.getElementById('chat-panel-root');
+    if (!root) {
+      root = document.createElement('section');
+      root.id = 'chat-panel-root';
+      root.className = 'chat-panel-root';
+      document.getElementById('main-content').appendChild(root);
+    }
+
+    if (!chatPanel || chatPanel.root !== root) {
+      chatPanel = mountContractChatPanel('#chat-panel-root', {
+        mode: 'api',
+        endpoint: 'http://localhost:5055/api/chat',
+        initialOpen: false,
+        title: 'Contract Assistant',
+        subtitle: 'RAG-backed opportunity guidance',
+        placeholder: 'Ask which opportunities fit your vendor profile...'
+      });
+    }
+  }
+
+  ensureChatPanel();
+  window.addEventListener('dashboard:main-rendered', ensureChatPanel);
 </script>
 
 </body>

@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760">
+  <defs>
+    <style>
+      .bg { fill: #f8fafc; }
+      .title { font: 700 30px Arial, sans-serif; fill: #0f172a; }
+      .box { fill: #ffffff; stroke: #2563eb; stroke-width: 2; rx: 12; }
+      .green { stroke: #16a34a; }
+      .orange { stroke: #ea580c; }
+      .text { font: 16px Arial, sans-serif; fill: #0f172a; }
+      .small { font: 14px Arial, sans-serif; fill: #334155; }
+      .code { font: 14px Consolas, monospace; fill: #0f172a; }
+      .arrow { stroke: #0f172a; stroke-width: 2.2; marker-end: url(#arrow); fill: none; }
+      .dash { stroke-dasharray: 7 6; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0f172a"/>
+    </marker>
+  </defs>
+  <rect class="bg" width="1200" height="760"/>
+  <text class="title" x="48" y="58">How to Run the Chatbot</text>
+
+  <rect class="box" x="56" y="130" width="250" height="160"/>
+  <text class="text" x="118" y="168">1. Install deps</text>
+  <text class="code" x="82" y="204">python -m pip install \</text>
+  <text class="code" x="82" y="226">  -r dependencies/requirements.txt</text>
+  <text class="small" x="82" y="260">Optional for offline sample/mock.</text>
+
+  <rect class="box green" x="374" y="130" width="250" height="160"/>
+  <text class="text" x="434" y="168">2. Build index</text>
+  <text class="code" x="398" y="204">python index.py \</text>
+  <text class="code" x="398" y="226">  --source sample --rebuild</text>
+  <text class="small" x="398" y="260">Writes .rag_index/index.json</text>
+
+  <rect class="box green" x="692" y="130" width="250" height="160"/>
+  <text class="text" x="752" y="168">3. Start chat</text>
+  <text class="code" x="716" y="204">python chat.py</text>
+  <text class="small" x="716" y="236">Loads existing index, then waits</text>
+  <text class="small" x="716" y="258">for questions.</text>
+
+  <rect class="box orange" x="374" y="410" width="360" height="172"/>
+  <text class="text" x="456" y="448">Offline guaranteed run</text>
+  <text class="code" x="402" y="486">python chat.py \</text>
+  <text class="code" x="402" y="508">  --source sample \</text>
+  <text class="code" x="402" y="530">  --llm-provider mock \</text>
+  <text class="code" x="402" y="552">  --rebuild-index</text>
+
+  <rect class="box" x="804" y="410" width="320" height="172"/>
+  <text class="text" x="918" y="448">Inside chat</text>
+  <text class="code" x="834" y="486">:sources</text>
+  <text class="small" x="930" y="486">show last retrieved hits</text>
+  <text class="code" x="834" y="518">:reindex</text>
+  <text class="small" x="930" y="518">rebuild from source</text>
+  <text class="code" x="834" y="550">:quit</text>
+  <text class="small" x="930" y="550">exit</text>
+
+  <rect class="box" x="56" y="410" width="250" height="172"/>
+  <text class="text" x="118" y="448">Config knobs</text>
+  <text class="code" x="82" y="484">RAG_DATA_SOURCE</text>
+  <text class="code" x="82" y="510">RAG_LLM_PROVIDER</text>
+  <text class="code" x="82" y="536">RAG_INDEX_PATH</text>
+  <text class="small" x="82" y="564">CLI args override .env.</text>
+
+  <path class="arrow" d="M 306 210 L 374 210"/>
+  <path class="arrow" d="M 624 210 L 692 210"/>
+  <path class="arrow dash" d="M 817 290 L 585 410"/>
+  <path class="arrow dash" d="M 306 496 L 374 496"/>
+  <path class="arrow dash" d="M 734 496 L 804 496"/>
+</svg>

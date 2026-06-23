@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760">
+  <defs>
+    <style>
+      .bg { fill: #f8fafc; }
+      .title { font: 700 30px Arial, sans-serif; fill: #0f172a; }
+      .box { fill: #ffffff; stroke: #2563eb; stroke-width: 2; rx: 12; }
+      .green { stroke: #16a34a; }
+      .orange { stroke: #ea580c; }
+      .diamond { fill: #ffffff; stroke: #2563eb; stroke-width: 2; }
+      .text { font: 16px Arial, sans-serif; fill: #0f172a; }
+      .small { font: 14px Arial, sans-serif; fill: #334155; }
+      .code { font: 14px Consolas, monospace; fill: #0f172a; }
+      .arrow { stroke: #0f172a; stroke-width: 2.2; marker-end: url(#arrow); fill: none; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0f172a"/>
+    </marker>
+  </defs>
+  <rect class="bg" width="1200" height="760"/>
+  <text class="title" x="48" y="58">What Happens When You Ask a Question</text>
+
+  <rect class="box" x="450" y="110" width="300" height="72"/>
+  <text class="text" x="526" y="142">User question</text>
+  <text class="code" x="492" y="166">Find AI cloud contracts</text>
+
+  <polygon class="diamond" points="600,230 760,318 600,406 440,318"/>
+  <text class="text" x="516" y="306">General greeting</text>
+  <text class="text" x="514" y="330">or help query?</text>
+
+  <rect class="box orange" x="820" y="270" width="290" height="112"/>
+  <text class="text" x="894" y="308">General Answer</text>
+  <text class="code" x="852" y="334">llm.answer_general()</text>
+  <text class="small" x="852" y="360">no retrieved sources</text>
+
+  <rect class="box green" x="110" y="490" width="260" height="112"/>
+  <text class="text" x="168" y="528">Search Index</text>
+  <text class="code" x="140" y="554">retriever.search()</text>
+  <text class="small" x="140" y="580">top_k + min_score</text>
+
+  <rect class="box green" x="470" y="490" width="260" height="112"/>
+  <text class="text" x="530" y="528">Generate Answer</text>
+  <text class="code" x="500" y="554">llm.answer(q, hits)</text>
+  <text class="small" x="500" y="580">grounded prompt context</text>
+
+  <rect class="box" x="830" y="490" width="290" height="112"/>
+  <text class="text" x="896" y="528">Final Response</text>
+  <text class="small" x="862" y="556">answer text</text>
+  <text class="small" x="862" y="580">Retrieved sources: title, id, agency, deadline, value, url, score</text>
+
+  <path class="arrow" d="M 600 182 L 600 230"/>
+  <path class="arrow" d="M 760 318 L 820 326"/>
+  <path class="arrow" d="M 600 406 L 240 490"/>
+  <path class="arrow" d="M 370 546 L 470 546"/>
+  <path class="arrow" d="M 730 546 L 830 546"/>
+  <path class="arrow" d="M 965 382 L 965 490"/>
+
+  <text class="small" x="772" y="300">yes</text>
+  <text class="small" x="410" y="426">no, use RAG</text>
+</svg>

@@ -5,10 +5,10 @@ This folder contains a standalone terminal RAG assistant for government contract
 ## Quick Start
 
 ```bash
-python -m pip install -r requirements.txt
-python smoke_test.py
+python -m pip install -r dependencies/requirements.txt
+python -m tests.smoke_test
 python -m unittest discover -s tests
-python chat.py --source sample --rebuild-index
+python chat.py --source sample --llm-provider mock --rebuild-index
 ```
 
 Try prompts like:
@@ -30,7 +30,6 @@ Inside chat:
 
 - `chat.py`: Terminal chat entrypoint. Keeps `python chat.py` as the primary command.
 - `index.py`: Vector index build entrypoint. Keeps `python index.py --source sample --rebuild` available.
-- `cli/`: Terminal UI implementation.
 - `configuration/`: `.env` and environment variable loading into `Settings`.
 - `data/`: Data loading package plus bundled JSON fixtures.
 - `documents/`: Contract record normalization into indexable documents.
@@ -102,18 +101,11 @@ The DB loader performs read-only `SELECT` queries from `postings`.
 
 ## Optional Dependencies
 
-The default sample/mock path only needs `requirements.txt`.
+The default sample/mock path only uses the Python standard library. Install the bundled dependencies when you want `.env` loading, live HTTP LLM providers, or sentence-transformers embeddings.
 
 ```bash
-pip install -r requirements-db.txt          # PostgreSQL access with --source db
-pip install -r requirements-llm.txt         # live OpenAI-compatible, OpenAI, or Ollama providers
-pip install -r requirements-embeddings.txt  # sentence-transformers embeddings
-```
-
-`setup_codex_cloud.sh` installs optional groups when these flags are set:
-
-```bash
-RAG_INSTALL_DB=1 RAG_INSTALL_LIVE_DEPS=1 RAG_INSTALL_EMBEDDINGS=1 ./setup_codex_cloud.sh
+pip install -r dependencies/requirements.txt     # dotenv, requests, sentence-transformers
+pip install -r dependencies/requirements-db.txt  # PostgreSQL access with --source db
 ```
 
 ## LLM Providers
@@ -153,7 +145,6 @@ On Windows, `start_ollama.ps1` can start Ollama with model storage under this fo
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\start_ollama.ps1
-python live_smoke_test.py
 ```
 
 ## Indexing
@@ -171,7 +162,7 @@ The index is stored at `.rag_index/index.json` by default and is ignored by git.
 Optional semantic embeddings:
 
 ```bash
-pip install -r requirements-embeddings.txt
+pip install -r dependencies/requirements.txt
 RAG_EMBEDDING_PROVIDER=sentence-transformers
 RAG_EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
 python index.py --source sample --rebuild
@@ -184,17 +175,9 @@ The sentence-transformers path may need network access on first use to download 
 Run the default offline validation:
 
 ```bash
-python smoke_test.py
+python -m tests.smoke_test
 python -m unittest discover -s tests
 ```
-
-Run the optional live LLM smoke test after configuring a non-mock provider:
-
-```bash
-python live_smoke_test.py
-```
-
-`live_smoke_test.py` prints `SKIP` and exits successfully when provider variables are not configured.
 
 ## Integration
 

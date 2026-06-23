@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760">
+  <defs>
+    <style>
+      .bg { fill: #f8fafc; }
+      .title { font: 700 30px Arial, sans-serif; fill: #0f172a; }
+      .box { fill: #ffffff; stroke: #2563eb; stroke-width: 2; rx: 12; }
+      .green { stroke: #16a34a; }
+      .orange { stroke: #ea580c; }
+      .text { font: 16px Arial, sans-serif; fill: #0f172a; }
+      .small { font: 14px Arial, sans-serif; fill: #334155; }
+      .code { font: 14px Consolas, monospace; fill: #0f172a; }
+      .arrow { stroke: #0f172a; stroke-width: 2.2; marker-end: url(#arrow); fill: none; }
+      .dash { stroke-dasharray: 7 6; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0f172a"/>
+    </marker>
+  </defs>
+  <rect class="bg" width="1200" height="760"/>
+  <text class="title" x="48" y="58">How to Test It</text>
+
+  <text class="text" x="70" y="120">Path A: Use the prewritten tests</text>
+  <rect class="box green" x="70" y="150" width="300" height="150"/>
+  <text class="text" x="138" y="188">Fast smoke test</text>
+  <text class="code" x="98" y="226">python -m tests.smoke_test</text>
+  <text class="small" x="98" y="258">Builds temp sample index and</text>
+  <text class="small" x="98" y="280">asks one mock LLM question.</text>
+
+  <rect class="box green" x="450" y="150" width="300" height="150"/>
+  <text class="text" x="526" y="188">Full unit suite</text>
+  <text class="code" x="478" y="226">python -m unittest discover \</text>
+  <text class="code" x="478" y="248">  -s tests</text>
+  <text class="small" x="478" y="280">Covers loading, retrieval, and</text>
+  <text class="small" x="478" y="302">general fallback behavior.</text>
+
+  <rect class="box orange" x="830" y="150" width="300" height="150"/>
+  <text class="text" x="900" y="188">Optional semantic test</text>
+  <text class="code" x="858" y="226">test_eva_retrieval_quality.py</text>
+  <text class="small" x="858" y="258">Uses sentence-transformers and</text>
+  <text class="small" x="858" y="280">cached/downloaded model weights.</text>
+
+  <path class="arrow" d="M 370 225 L 450 225"/>
+  <path class="arrow" d="M 750 225 L 830 225"/>
+
+  <text class="text" x="70" y="390">Path B: Test manually without relying on prewritten tests</text>
+  <rect class="box" x="70" y="420" width="250" height="150"/>
+  <text class="text" x="130" y="458">1. Build index</text>
+  <text class="code" x="96" y="496">python index.py \</text>
+  <text class="code" x="96" y="518">  --source sample --rebuild</text>
+
+  <rect class="box" x="390" y="420" width="250" height="150"/>
+  <text class="text" x="454" y="458">2. Ask question</text>
+  <text class="code" x="416" y="496">python chat.py \</text>
+  <text class="code" x="416" y="518">  --llm-provider mock</text>
+
+  <rect class="box" x="710" y="420" width="250" height="150"/>
+  <text class="text" x="770" y="458">3. Inspect result</text>
+  <text class="small" x="740" y="492">Look for contract answer</text>
+  <text class="small" x="740" y="516">and Retrieved sources list.</text>
+  <text class="code" x="740" y="544">:sources</text>
+
+  <rect class="box orange" x="410" y="620" width="380" height="86"/>
+  <text class="text" x="504" y="654">Manual pass criteria</text>
+  <text class="small" x="438" y="684">No traceback, at least one relevant source, citation fields present.</text>
+
+  <path class="arrow" d="M 320 495 L 390 495"/>
+  <path class="arrow" d="M 640 495 L 710 495"/>
+  <path class="arrow dash" d="M 835 570 L 715 620"/>
+</svg>

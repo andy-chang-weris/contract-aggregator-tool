@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760">
+  <defs>
+    <style>
+      .bg { fill: #f8fafc; }
+      .title { font: 700 30px Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 16px Arial, sans-serif; fill: #475569; }
+      .box { fill: #ffffff; stroke: #2563eb; stroke-width: 2; rx: 12; }
+      .green { stroke: #16a34a; }
+      .orange { stroke: #ea580c; }
+      .text { font: 16px Arial, sans-serif; fill: #0f172a; }
+      .small { font: 14px Arial, sans-serif; fill: #334155; }
+      .code { font: 14px Consolas, monospace; fill: #0f172a; }
+      .arrow { stroke: #0f172a; stroke-width: 2.2; marker-end: url(#arrow); fill: none; }
+      .dash { stroke-dasharray: 7 6; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0f172a"/>
+    </marker>
+  </defs>
+  <rect class="bg" width="1200" height="760"/>
+  <text class="title" x="48" y="58">Contract RAG Chatbot Architecture</text>
+  <text class="subtitle" x="48" y="86">The local terminal app retrieves contract records, then asks a configured LLM to answer with cited sources.</text>
+
+  <rect class="box" x="48" y="160" width="160" height="96"/>
+  <text class="text" x="78" y="198">User Terminal</text>
+  <text class="code" x="72" y="226">python chat.py</text>
+
+  <rect class="box" x="284" y="150" width="178" height="116"/>
+  <text class="text" x="322" y="188">chat.py</text>
+  <text class="small" x="306" y="218">CLI loop</text>
+  <text class="small" x="306" y="242">:sources, :reindex</text>
+
+  <rect class="box" x="540" y="138" width="190" height="140"/>
+  <text class="text" x="588" y="178">RagAgent</text>
+  <text class="code" x="574" y="204">rag/agent.py</text>
+  <text class="small" x="566" y="232">orchestrates</text>
+  <text class="small" x="566" y="254">retrieval + answer</text>
+
+  <rect class="box green" x="820" y="120" width="250" height="130"/>
+  <text class="text" x="884" y="160">Retriever</text>
+  <text class="code" x="852" y="186">retrieval/retriever.py</text>
+  <text class="small" x="850" y="214">loads or rebuilds index</text>
+  <text class="small" x="850" y="236">filters by min score</text>
+
+  <rect class="box green" x="820" y="330" width="250" height="134"/>
+  <text class="text" x="888" y="370">Vector Index</text>
+  <text class="code" x="850" y="396">indexing/vector_index.py</text>
+  <text class="small" x="850" y="424">hash vectors by default</text>
+  <text class="small" x="850" y="446">optional sentence-transformers</text>
+
+  <rect class="box orange" x="508" y="540" width="254" height="130"/>
+  <text class="text" x="574" y="580">Data Sources</text>
+  <text class="code" x="546" y="606">data/sources.py</text>
+  <text class="small" x="540" y="634">sample JSON, SQL dump, DB</text>
+  <text class="small" x="540" y="656">auto falls back to sample</text>
+
+  <rect class="box orange" x="120" y="540" width="270" height="130"/>
+  <text class="text" x="196" y="580">LLM Providers</text>
+  <text class="code" x="162" y="606">generation/llm.py</text>
+  <text class="small" x="154" y="634">mock, openai, compatible</text>
+  <text class="small" x="154" y="656">ollama + graceful fallback</text>
+
+  <rect class="box" x="48" y="350" width="260" height="100"/>
+  <text class="text" x="100" y="390">Settings</text>
+  <text class="code" x="78" y="418">configuration/settings.py</text>
+  <text class="small" x="78" y="440">reads .env + CLI overrides</text>
+
+  <path class="arrow" d="M 208 208 L 284 208"/>
+  <path class="arrow" d="M 462 208 L 540 208"/>
+  <path class="arrow" d="M 730 204 L 820 184"/>
+  <path class="arrow" d="M 945 250 L 945 330"/>
+  <path class="arrow" d="M 820 400 L 762 594"/>
+  <path class="arrow" d="M 540 238 L 390 540"/>
+  <path class="arrow dash" d="M 178 350 L 318 266"/>
+  <path class="arrow dash" d="M 308 400 L 540 208"/>
+
+  <text class="small" x="224" y="190">question</text>
+  <text class="small" x="748" y="174">search</text>
+  <text class="small" x="960" y="298">top-k</text>
+  <text class="small" x="728" y="536">build/rebuild</text>
+  <text class="small" x="406" y="426">answer</text>
+</svg>

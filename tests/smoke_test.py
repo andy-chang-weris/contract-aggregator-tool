@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+import sys
 from uuid import uuid4
 
-from configuration import AGENT_DIR, load_settings
+AGENT_DIR = Path(__file__).resolve().parents[1]
+if str(AGENT_DIR) not in sys.path:
+    sys.path.insert(0, str(AGENT_DIR))
+
+from configuration import load_settings
 from rag import RagAgent
 
 

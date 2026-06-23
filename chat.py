@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 
 from configuration import load_settings
+from generation import LLMError, MockLLM
 from rag import RagAgent
 
 
@@ -93,6 +94,18 @@ def main() -> int:
 
         try:
             response = agent.ask(question)
+        except LLMError as exc:
+            if agent.settings.llm_provider == "mock":
+                print(f"Agent error: {exc}")
+                continue
+            print(f"LLM provider failed: {exc}")
+            print("Falling back to mock LLM for this chat session.")
+            agent.llm = MockLLM()
+            try:
+                response = agent.ask(question)
+            except Exception as fallback_exc:
+                print(f"Agent error: {fallback_exc}")
+                continue
         except Exception as exc:
             print(f"Agent error: {exc}")
             continue

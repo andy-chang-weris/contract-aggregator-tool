@@ -308,7 +308,7 @@ def store_postings(postings):
     cursor = conn.cursor()
 
     inserted = 0
-    skipped  = 0
+    updated  = 0
     BATCH_SIZE = 500
 
     try:
@@ -331,7 +331,10 @@ def store_postings(postings):
                     p.get("date_scraped"),  p.get("raw_response"),
                 ))
 
-            # executemany sends the whole batch in one round trip
+            # Upsert: insert new rows, update mutable fields on conflict.
+            # Stable identifiers (agency, naics, posted_date, title, etc.)
+            # are intentionally excluded from the UPDATE to avoid overwriting
+            # good data with a bad scrape.
             cursor.executemany("""
                 INSERT INTO postings (
                     source_site, external_id, url,
@@ -343,15 +346,24 @@ def store_postings(postings):
                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                     %s, %s, %s, %s, %s, %s, %s, %s, %s
                 )
-                ON CONFLICT (url) DO NOTHING
+                ON CONFLICT (url) DO UPDATE SET
+                    award_status   = EXCLUDED.award_status,
+                    acq_strategy   = EXCLUDED.acq_strategy,
+                    deadline       = EXCLUDED.deadline,
+                    award_date     = EXCLUDED.award_date,
+                    contract_value = EXCLUDED.contract_value,
+                    description    = EXCLUDED.description,
+                    date_scraped   = EXCLUDED.date_scraped,
+                    raw_response   = EXCLUDED.raw_response
             """, values)
 
-            batch_inserted = cursor.rowcount
-            inserted += batch_inserted
-            skipped  += len(batch) - batch_inserted
+            # rowcount with executemany reflects total rows affected (inserted
+            # + updated). We track it as a combined "processed" count.
+            batch_processed = cursor.rowcount
+            inserted += batch_processed
 
             conn.commit()
-            print(f"  [db] Batch {i // BATCH_SIZE + 1}: inserted {batch_inserted} / {len(batch)}")
+            print(f"  [db] Batch {i // BATCH_SIZE + 1}: processed {batch_processed} / {len(batch)}")
 
     except Exception as e:
         conn.rollback()
@@ -362,8 +374,9 @@ def store_postings(postings):
         cursor.close()
         conn.close()
 
-    print(f"  [db] Inserted: {inserted} | Skipped (duplicates): {skipped}")
+    print(f"  [db] Done. {inserted} rows inserted or updated.")
     return inserted
+
 
 def remove_expired(days_grace=0):
     """

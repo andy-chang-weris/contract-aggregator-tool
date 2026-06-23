@@ -880,3 +880,37 @@ a.chip.active:hover {
   color: var(--navy);
   font-weight: 700;
 }
+
+/* ── Card description ─────────────────────────────────────── */
+.card-description {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+
+.desc-text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text2);
+  white-space: normal;
+  word-break: break-word;
+}
+
+.desc-toggle {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--teal-dark);
+  background: none;
+  border: none;
+  padding: 4px 0 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: color .15s;
+}
+
+.desc-toggle:hover {
+  color: var(--navy);
+}

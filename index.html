@@ -311,6 +311,56 @@
     return `<div class="relevance-reasons"><span class="reason-label">Why ranked:</span>${chips}</div>`;
   }
 
+  /* ── Description helpers ──────────────────────────────────── */
+  const DESCRIPTION_TRUNCATE = 300;
+
+  function renderDescription(c) {
+    const raw = (c.description || '').trim();
+    if (!raw) return '';
+
+    const cardId = `desc-${Number(c.id) || Math.random().toString(36).slice(2)}`;
+    const needsTruncation = raw.length > DESCRIPTION_TRUNCATE;
+    const preview = needsTruncation ? raw.slice(0, DESCRIPTION_TRUNCATE).trimEnd() : raw;
+
+    if (!needsTruncation) {
+      return `
+        <div class="card-description">
+          <p class="desc-text">${escHtml(preview)}</p>
+        </div>`;
+    }
+
+    return `
+      <div class="card-description" id="${cardId}">
+        <p class="desc-text">
+          <span class="desc-preview">${escHtml(preview)}&hellip;</span>
+          <span class="desc-full" hidden>${escHtml(raw)}</span>
+        </p>
+        <button class="desc-toggle" onclick="toggleDesc('${cardId}', this)" aria-expanded="false">
+          <i class="ti ti-chevron-down" aria-hidden="true"></i> Show more
+        </button>
+      </div>`;
+  }
+
+  function toggleDesc(cardId, btn) {
+    const container = document.getElementById(cardId);
+    if (!container) return;
+    const preview = container.querySelector('.desc-preview');
+    const full    = container.querySelector('.desc-full');
+    const expanded = btn.getAttribute('aria-expanded') === 'true';
+
+    if (expanded) {
+      preview.hidden = false;
+      full.hidden    = true;
+      btn.setAttribute('aria-expanded', 'false');
+      btn.innerHTML  = '<i class="ti ti-chevron-down" aria-hidden="true"></i> Show more';
+    } else {
+      preview.hidden = true;
+      full.hidden    = false;
+      btn.setAttribute('aria-expanded', 'true');
+      btn.innerHTML  = '<i class="ti ti-chevron-up" aria-hidden="true"></i> Show less';
+    }
+  }
+
   function trainPreferencesInBackground() {
     if (!AUTO_TRAIN_AFTER_FEEDBACK || !CLIENT_ID) return;
 
@@ -446,7 +496,7 @@
             : ''}
         </div>
         ${renderRelevanceReasons(c)}
-
+        ${renderDescription(c)}
         <div class="feedback-row">
           <button class="feedback-btn positive"
                   onclick="sendFeedback(${Number(c.id) || 0}, 'highly_relevant', this)">

@@ -54,7 +54,9 @@ def is_virginia(place: str | None) -> bool:
 def clean_html(text):
     if not text:
         return None
-    return re.sub(r"<[^>]+>", "", text).strip()
+    text = re.sub(r"<[^>]+>", "", text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
 
 
 def extract_naics_code(raw):

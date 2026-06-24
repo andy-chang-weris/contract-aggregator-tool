@@ -68,7 +68,7 @@
     <!-- Source filter -->
     <div class="field">
       <label for="f-source">Data source</label>
-      <select id="f-source">
+      <select id="f-source" onchange="scopeContractTypes()">
         <option value="">All sources</option>
         <option value="SAM.gov">SAM.gov</option>
         <option value="Acquisition Gateway Forecast">Acquisition Gateway</option>
@@ -200,6 +200,35 @@
     });
   });
 
+  /* ── Contract type scoping ────────────────────────────────── */
+  // Maps f-source option values to their corresponding optgroup labels in f-ptype
+  const SOURCE_TO_OPTGROUP = {
+    'SAM.gov':                      'SAM.gov',
+    'Acquisition Gateway Forecast': 'Acquisition Gateway',
+    'Virginia eVA':                 'Virginia eVA',
+  };
+
+  function scopeContractTypes() {
+    const source    = document.getElementById('f-source').value;
+    const ptypeEl   = document.getElementById('f-ptype');
+    const activeLabel = SOURCE_TO_OPTGROUP[source] || null;
+
+    ptypeEl.querySelectorAll('optgroup').forEach(group => {
+      const visible = activeLabel === null || group.label === activeLabel;
+      group.style.display = visible ? '' : 'none';
+      group.querySelectorAll('option').forEach(opt => {
+        opt.disabled = !visible;
+      });
+    });
+
+    // If the currently selected type belongs to a now-hidden group, reset it
+    const selected = ptypeEl.options[ptypeEl.selectedIndex];
+    if (selected && selected.parentElement.tagName === 'OPTGROUP' &&
+        selected.parentElement.style.display === 'none') {
+      ptypeEl.value = '';
+    }
+  }
+
   /* ── Clear filters ────────────────────────────────────────── */
   function clearFilters() {
     document.getElementById('f-source').value = '';
@@ -207,6 +236,7 @@
     document.getElementById('f-org').value    = '';
     selectedNaics.clear();
     document.querySelectorAll('.naics-tag.selected').forEach(t => t.classList.remove('selected'));
+    scopeContractTypes();
   }
 
   /* ── Proxy health check ───────────────────────────────────── */

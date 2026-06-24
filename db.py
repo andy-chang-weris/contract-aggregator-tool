@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 db.py — PostgreSQL database layer
 

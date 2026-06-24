@@ -2,8 +2,7 @@
 """
 Scrape only currently open records from the public eVA All Opportunities page.
 
-Scope is intentionally narrow. This script reads the target URL from
-website.txt and fetches only:
+This script reads the target URL from website.txt and fetches only:
   1. the target AllOpportunities.jsp page
   2. the AllOpportunitiesapp.js asset referenced by that page
   3. the in-page solrconnect.jsp endpoint
@@ -53,6 +52,28 @@ OPEN_QUERIES = [
     ('status:"Open"', []),
     ("status:Open",  []),
 ]
+
+# ── Allowed contract types ────────────────────────────────────────────────────
+# Matched against doccddesc (the award_status label eVA returns).
+# Key is a substring to match (case-insensitive), value is the display label.
+EVA_ALLOWED_TYPES: dict[str, str] = {
+    "request for proposal": "RFP",
+    "request for information": "RFI",
+    "quick quote": "Quick Quote",
+}
+
+def get_eva_contract_type(doc: dict) -> str | None:
+    """
+    Returns the normalized contract type label if the doc is an allowed type,
+    or None if it should be skipped.
+    Matches against doccddesc (e.g. 'Request for Proposal (RFP)').
+    """
+    doccddesc = clean(doc.get("doccddesc")).lower()
+
+    for substring, label in EVA_ALLOWED_TYPES.items():
+        if substring in doccddesc:
+            return label
+    return None
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -181,7 +202,7 @@ class EvaClient:
                 payload = self.fetch_json(url)
                 count = int(payload.get("response", {}).get("numFound", 0) or 0)
                 if 0 < count <= MAX_OPEN:
-                    print(f"  [eva] Open query found: q={q} fq={fqs} → {count} records")
+                    print(f"  [eva] Open query found: q={q} fq={fqs} -> {count} records")
                     return q, fqs, count
             except Exception as e:
                 print(f"  [eva] Query candidate failed: {e}")
@@ -189,22 +210,22 @@ class EvaClient:
         raise RuntimeError("No working Open-status query found for eVA")
 
 
-# ── Normalize a Solr doc → schema ──────────────────────────────────────
-def normalize_doc(doc: dict, target_url: str) -> dict:
+# ── Normalize a Solr doc -> schema ──────────────────────────────────────
+def normalize_doc(doc: dict, target_url: str, contract_type: str) -> dict:
     """
     Maps a single eVA Solr document to the agreed postings schema.
 
     eVA field mapping:
-      id / internalid    → external_id
-      agencyname         → agency
-      buyerdeptname      → organization
-      pubdate            → posted_date
-      closedate          → deadline
-      shortdesc          → title
-      longdesc           → description
-      doccddesc          → award_status (contract type label)
-      setasideshortdesc  → acq_strategy
-      workloc            → place_of_performance
+      id / internalid    -> external_id
+      agencyname         -> agency
+      buyerdeptname      -> organization
+      pubdate            -> posted_date
+      closedate          -> deadline
+      shortdesc          -> title
+      longdesc           -> description
+      doccddesc          -> award_status (contract type label)
+      setasideshortdesc  -> acq_strategy
+      workloc            -> place_of_performance
     """
     internal_id = clean(doc.get("internalid") or doc.get("id") or "")
     version     = clean(doc.get("version") or "")
@@ -229,8 +250,8 @@ def normalize_doc(doc: dict, target_url: str) -> dict:
         "agency":               clean(doc.get("agencyname")) or None,
         "naics":                None,   # eVA uses commodity codes, not NAICS
         "posted_date":          parse_date(doc.get("pubdate")),
-        "contract_type":        None,   # eVA doesn't have a direct contract type
-        "place_of_performance": clean(doc.get("workloc")) or "Virginia",
+        "contract_type":        contract_type,
+        "place_of_performance": (lambda w: w if w and len(w) <= 120 else "Virginia")(clean(doc.get("workloc"))),
 
         # Extra columns
         "title":                clean(doc.get("shortdesc")) or None,
@@ -253,6 +274,7 @@ def fetch_and_parse() -> list[dict]:
     """
     Fetches all Open opportunities from eVA and returns
     a list of normalized postings ready for store_postings().
+    Only RFP, RFI, and Quick Quote records are included.
     """
     target_url = load_target_url()
     client     = EvaClient(target_url)
@@ -263,14 +285,15 @@ def fetch_and_parse() -> list[dict]:
 
     # Step 2: Verify AllOpportunitiesapp.js is referenced (scope check)
     if not APP_JS_RE.search(page_html):
-        raise RuntimeError("AllOpportunitiesapp.js not found on page — site may have changed")
+        raise RuntimeError("AllOpportunitiesapp.js not found on page -- site may have changed")
 
     # Step 3: Find working Open query
     q, fqs, total = client.find_open_query()
-    print(f"  [eva] Fetching {total} Open opportunities...")
+    print(f"  [eva] Fetching {total} Open opportunities (RFP/RFI/Quick Quote only)...")
 
     # Step 4: Paginate through all records
     all_postings = []
+    skipped_type = 0
     start        = 0
 
     while start < total:
@@ -280,21 +303,28 @@ def fetch_and_parse() -> list[dict]:
         docs    = payload.get("response", {}).get("docs", [])
 
         if not docs:
-            print(f"  [eva] Empty page at start={start} — stopping.")
+            print(f"  [eva] Empty page at start={start} -- stopping.")
             break
 
         for doc in docs:
             # Only include Open records (double-check server filter)
             if clean(doc.get("status")).lower() != "open":
                 continue
-            posting = normalize_doc(doc, target_url)
+
+            # Only include allowed contract types
+            contract_type = get_eva_contract_type(doc)
+            if contract_type is None:
+                skipped_type += 1
+                continue
+
+            posting = normalize_doc(doc, target_url, contract_type)
             all_postings.append(posting)
 
         start += len(docs)
-        print(f"  [eva] Fetched {len(all_postings):,} / {total:,}", end="\r")
+        print(f"  [eva] {len(all_postings):,} kept / {skipped_type:,} skipped (type) / {start:,} scanned", end="\r")
 
         if len(docs) < rows:
             break
 
-    print(f"\n  [eva] Done. {len(all_postings):,} open opportunities fetched.")
+    print(f"\n  [eva] Done. {len(all_postings):,} RFP/RFI/Quick Quote records kept, {skipped_type:,} other types skipped.")
     return all_postings

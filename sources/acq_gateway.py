@@ -1,5 +1,6 @@
+#!/usr/bin/env python3
 """
-Acquisition Gateway Forecast parser — Virginia contracts, allowed types only.
+Acquisition Gateway Forecast parser — Virginia contracts, allowed types + allowed NAICS only.
 """
 
 import requests
@@ -31,6 +32,26 @@ def is_allowed_type_ag(award_status: str | None) -> bool:
         return False
     s = award_status.lower().strip()
     return any(t in s for t in AG_ALLOWED_TYPES)
+
+# ── Allowed NAICS codes ───────────────────────────────────────────────────────
+# Only store contracts whose NAICS falls under one of these codes.
+# Mirrors the filterable NAICS set exposed in the UI.
+ALLOWED_NAICS = {
+    "541611",  # Administrative management consulting
+    "541618",  # Other management consulting
+    "541690",  # Other scientific & technical consulting
+    "541990",  # Other professional services
+    "541330",  # Engineering services
+    "541511",  # Custom computer programming
+    "541512",  # Computer systems design
+    "541513",  # Computer facilities management
+    "541519",  # Other computer-related services
+}
+
+def is_allowed_naics(naics: str | None) -> bool:
+    if not naics:
+        return False
+    return naics.strip() in ALLOWED_NAICS
 
 def parse_unix_date(value):
     if not value:
@@ -115,7 +136,7 @@ def fetch_page(page_number):
 
 
 def fetch_and_parse():
-    """Fetch all pages, return only Virginia + allowed-type postings."""
+    """Fetch all pages, return only Virginia + allowed-type + allowed-NAICS postings."""
     all_postings = []
     page = 1
 
@@ -161,5 +182,10 @@ def fetch_and_parse():
     before = len(all_postings)
     all_postings = [p for p in all_postings if is_allowed_type_ag(p.get("award_status"))]
     print(f"  [acq_gateway] Type filter: {before:,} → {len(all_postings):,} records.")
+
+    # NAICS filter
+    before = len(all_postings)
+    all_postings = [p for p in all_postings if is_allowed_naics(p.get("naics"))]
+    print(f"  [acq_gateway] NAICS filter: {before:,} → {len(all_postings):,} records.")
 
     return all_postings

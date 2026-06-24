@@ -1,5 +1,6 @@
+#!/usr/bin/env python3
 """
-SAM.gov parser — Virginia contracts only, allowed types only.
+SAM.gov parser — Virginia contracts only, allowed types + allowed NAICS only.
 
 LOCAL MODE: reads from sam_opportunities.csv
 LIVE MODE:  calls SAM.gov API directly with state=VA filter.
@@ -37,6 +38,26 @@ def is_allowed_type_sam(award_status: str | None) -> bool:
         return False
     s = award_status.lower()
     return any(t in s for t in SAM_ALLOWED_TYPES)
+
+# ── Allowed NAICS codes ───────────────────────────────────────────────────────
+# Only store contracts whose NAICS falls under one of these codes.
+# Mirrors the filterable NAICS set exposed in the UI.
+ALLOWED_NAICS = {
+    "541611",  # Administrative management consulting
+    "541618",  # Other management consulting
+    "541690",  # Other scientific & technical consulting
+    "541990",  # Other professional services
+    "541330",  # Engineering services
+    "541511",  # Custom computer programming
+    "541512",  # Computer systems design
+    "541513",  # Computer facilities management
+    "541519",  # Other computer-related services
+}
+
+def is_allowed_naics(naics: str | None) -> bool:
+    if not naics:
+        return False
+    return naics.strip() in ALLOWED_NAICS
 
 # ── Virginia matching ─────────────────────────────────────────────────────────
 VIRGINIA_TERMS = {"VA", "VIRGINIA"}
@@ -190,6 +211,11 @@ def load_from_csv(filepath=LOCAL_CSV_FILE):
     records = [r for r in records if is_allowed_type_sam(r.get("award_status"))]
     print(f"  [sam_gov] Type filter: {before:,} → {len(records):,} records.")
 
+    # NAICS filter
+    before = len(records)
+    records = [r for r in records if is_allowed_naics(r.get("naics"))]
+    print(f"  [sam_gov] NAICS filter: {before:,} → {len(records):,} records.")
+
     return records
 
 
@@ -222,6 +248,11 @@ def load_from_json(filepath=LOCAL_JSON_FILE):
     before = len(records)
     records = [r for r in records if is_allowed_type_sam(r.get("award_status"))]
     print(f"  [sam_gov] Type filter: {before:,} → {len(records):,} records.")
+
+    # NAICS filter
+    before = len(records)
+    records = [r for r in records if is_allowed_naics(r.get("naics"))]
+    print(f"  [sam_gov] NAICS filter: {before:,} → {len(records):,} records.")
 
     return records
 
@@ -264,7 +295,8 @@ def fetch_from_api(posted_from="01/01/2026", posted_to=None, limit=1000):
         for item in items:
             try:
                 record = normalize_json_record(item)
-                if is_allowed_type_sam(record.get("award_status")):
+                if (is_allowed_type_sam(record.get("award_status"))
+                        and is_allowed_naics(record.get("naics"))):
                     all_records.append(record)
             except Exception as e:
                 print(f"  [sam_gov] Record error: {e}")
@@ -274,7 +306,7 @@ def fetch_from_api(posted_from="01/01/2026", posted_to=None, limit=1000):
 
         offset += limit
         if offset >= total:
-            print(f"  [sam_gov] Done. {len(all_records):,} Virginia + allowed-type records fetched.")
+            print(f"  [sam_gov] Done. {len(all_records):,} Virginia + allowed-type + allowed-NAICS records fetched.")
             break
 
         time.sleep(1)

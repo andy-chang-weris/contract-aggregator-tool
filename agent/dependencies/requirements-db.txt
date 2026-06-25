@@ -1,0 +1,2 @@
+# Optional PostgreSQL access for RAG_DATA_SOURCE=db.
+psycopg2-binary>=2.9.9

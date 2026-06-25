@@ -348,6 +348,7 @@ def store_postings(postings):
                     %s, %s, %s, %s, %s, %s, %s, %s, %s
                 )
                 ON CONFLICT (url) DO UPDATE SET
+                    naics          = EXCLUDED.naics,
                     award_status   = EXCLUDED.award_status,
                     acq_strategy   = EXCLUDED.acq_strategy,
                     deadline       = EXCLUDED.deadline,

@@ -282,7 +282,7 @@ def fetch_from_api(posted_from="01/01/2026", posted_to=None, limit=1000):
 
         print(f"  [sam_gov] Fetching offset {offset}...")
         try:
-            resp = requests.get(SAM_BASE_URL, params=params, timeout=15)
+            resp = requests.get(SAM_BASE_URL, params=params, timeout=60)
             resp.raise_for_status()
         except requests.exceptions.RequestException as e:
             print(f"  [sam_gov] API error: {e}")

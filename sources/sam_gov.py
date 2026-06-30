@@ -295,7 +295,8 @@ def fetch_from_api(posted_from="01/01/2026", posted_to=None, limit=1000):
         for item in items:
             try:
                 record = normalize_json_record(item)
-                if (is_allowed_type_sam(record.get("award_status"))
+                if (is_virginia(record.get("place_of_performance"))
+                        and is_allowed_type_sam(record.get("award_status"))
                         and is_allowed_naics(record.get("naics"))):
                     all_records.append(record)
             except Exception as e:

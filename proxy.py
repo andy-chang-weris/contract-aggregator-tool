@@ -13,6 +13,10 @@ from flask_cors import CORS
 from uuid import UUID
 from preference_training import train_client_preferences
 from relevance_ranking import rank_postings
+from ml_training import train_client_model
+from pathlib import Path
+
+MODEL_DIR = Path(os.getenv("ML_MODEL_DIR", "./models"))
 
 try:
     from dotenv import load_dotenv
@@ -619,6 +623,90 @@ def ranked_opportunities(client_id):
         "ranked": True,
         "cached": False,
     })
+
+@app.route("/api/clients/<client_id>/train-ml-model", methods=["POST"])
+def train_ml_model_endpoint(client_id):
+    try:
+        client_id = parse_uuid(client_id, "client_id")
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+ 
+    data = request.get_json(silent=True) or {}
+ 
+    try:
+        min_feedback_events = parse_int(
+            data.get("min_feedback_events", 50),
+            "min_feedback_events"
+        )
+        include_clicks = parse_bool(data.get("include_clicks"), default=True)
+        min_category_count = parse_int(
+            data.get("min_category_count", 2),
+            "min_category_count"
+        )
+        max_keywords = parse_int(
+            data.get("max_keywords", 200),
+            "max_keywords"
+        )
+        min_keyword_count = parse_int(
+            data.get("min_keyword_count", 2),
+            "min_keyword_count"
+        )
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+ 
+    if min_feedback_events < 1:
+        return jsonify({"error": "min_feedback_events must be at least 1"}), 400
+    if min_category_count < 1:
+        return jsonify({"error": "min_category_count must be at least 1"}), 400
+    if max_keywords < 1 or max_keywords > 2000:
+        return jsonify({"error": "max_keywords must be between 1 and 2000"}), 400
+    if min_keyword_count < 1:
+        return jsonify({"error": "min_keyword_count must be at least 1"}), 400
+ 
+    try:
+        result = train_client_model(
+            get_db,
+            client_id,
+            min_feedback_events=min_feedback_events,
+            include_clicks=include_clicks,
+            model_dir=MODEL_DIR,
+            min_category_count=min_category_count,
+            max_keywords=max_keywords,
+            min_keyword_count=min_keyword_count,
+        )
+        status_code = 200 if result.get("status") not in ("error",) else 404
+        return jsonify(result), status_code
+ 
+    except Exception as e:
+        return jsonify({"error": f"ML training error: {str(e)}"}), 500
+ 
+ 
+@app.route("/api/clients/<client_id>/ml-model-status")
+def ml_model_status_endpoint(client_id):
+    """Lightweight check used by the frontend / scheduler to decide whether
+    a model exists yet and how old it is, without re-running training."""
+    try:
+        client_id = parse_uuid(client_id, "client_id")
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+ 
+    model_path = MODEL_DIR / f"{client_id}.pkl"
+    if not model_path.exists():
+        return jsonify({"client_id": client_id, "has_model": False})
+ 
+    try:
+        import pickle
+        with open(model_path, "rb") as fh:
+            bundle = pickle.load(fh)
+        return jsonify({
+            "client_id": client_id,
+            "has_model": True,
+            "trained_at": bundle.get("trained_at"),
+            "feedback_events": bundle.get("feedback_events"),
+            "train_accuracy": bundle.get("train_accuracy"),
+        })
+    except Exception as e:
+        return jsonify({"error": f"Could not read model file: {str(e)}"}), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

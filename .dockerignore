@@ -7,3 +7,9 @@ __pycache__/
 .venv/
 venv/
 terraform/
+agent/data/ollama_models/
+agent/.rag_index/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+*.tfvars
+*.tfvars.json

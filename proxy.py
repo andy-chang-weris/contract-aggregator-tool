@@ -14,6 +14,8 @@ from uuid import UUID
 from preference_training import train_client_preferences
 from relevance_ranking import rank_postings
 
+from aws_secrets import get_db_config
+
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -84,12 +86,17 @@ def cache_set(key, data):
 
 # ── PostgreSQL connection ─────────────────────────────────────────────────────
 def get_db():
+    config = get_db_config(
+        os.environ["DB_SECRET_NAME"]
+    )
+
     return psycopg2.connect(
-        host=os.getenv("DB_HOST",     "localhost"),
-        port=os.getenv("DB_PORT",     "5432"),
-        dbname=os.getenv("DB_NAME",   "govcontracts"),
-        user=os.getenv("DB_USER",     "postgres"),
-        password=os.getenv("DB_PASSWORD", ""),
+
+        host=config["host"],
+        port=config["port"],
+        dbname=config["database"],
+        user=config["username"],
+        password=config["password"],
     )
 
 

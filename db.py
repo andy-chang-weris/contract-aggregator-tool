@@ -14,6 +14,8 @@ import psycopg2
 import psycopg2.extras
 from datetime import datetime
 
+from aws_secrets import get_db_config
+
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -23,11 +25,26 @@ except ImportError:
 
 # ── Connection ────────────────────────────────────────────────────────────────
 def get_connection():
+
+    secret_name = os.getenv("DB_SECRET_NAME")
+
+    if secret_name:
+        config = get_db_config(secret_name)
+
+        return psycopg2.connect(
+            host=config["host"],
+            port=config["port"],
+            dbname=config["database"],
+            user=config["username"],
+            password=config["password"],
+        )
+
+    # Local development fallback
     return psycopg2.connect(
-        host=os.getenv("DB_HOST",     "localhost"),
-        port=os.getenv("DB_PORT",     "5432"),
-        dbname=os.getenv("DB_NAME",   "govcontracts"),
-        user=os.getenv("DB_USER",     "postgres"),
+        host=os.getenv("DB_HOST", "localhost"),
+        port=os.getenv("DB_PORT", "5432"),
+        dbname=os.getenv("DB_NAME", "govcontracts"),
+        user=os.getenv("DB_USER", "postgres"),
         password=os.getenv("DB_PASSWORD", ""),
     )
 

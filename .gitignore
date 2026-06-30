@@ -21,3 +21,10 @@ env/
 # IDE files
 .vscode/
 .idea/
+
+.terraform
+.terraform.*
+terraform/*.tfstate
+terraform/*.tfstate.backup
+*.tfvars
+*.tfvars.json

@@ -1,0 +1,63 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760">
+  <defs>
+    <style>
+      .bg { fill: #ffffff; }
+      .title { font: 700 28px Arial, sans-serif; fill: #111827; }
+      .note { font: 14px Arial, sans-serif; fill: #6b7280; }
+      .box { fill: #ffffff; stroke: #111827; stroke-width: 2; rx: 14; }
+      .side { fill: #f9fafb; stroke: #d1d5db; stroke-width: 1.5; rx: 14; }
+      .aws { fill: #fff7ed; stroke: #fb923c; stroke-width: 2; rx: 14; }
+      .good { fill: #ecfdf5; stroke: #10b981; stroke-width: 2; rx: 14; }
+      .ops { fill: #f5f3ff; stroke: #8b5cf6; stroke-width: 2; rx: 14; }
+      .label { font: 700 16px Arial, sans-serif; fill: #111827; }
+      .small { font: 13px Arial, sans-serif; fill: #374151; }
+      .tiny { font: 12px Arial, sans-serif; fill: #6b7280; }
+      .num { font: 700 13px Arial, sans-serif; fill: #ffffff; }
+      .bubble { fill: #111827; }
+      .arrow { stroke: #111827; stroke-width: 2.4; fill: none; marker-end: url(#arrow); }
+      .dash { stroke: #6b7280; stroke-width: 2; fill: none; stroke-dasharray: 7 6; marker-end: url(#arrow-gray); }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M1,1 L9,5 L1,9 Z" fill="#111827" /></marker>
+    <marker id="arrow-gray" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M1,1 L9,5 L1,9 Z" fill="#6b7280" /></marker>
+  </defs>
+
+  <rect class="bg" width="1280" height="760" />
+  <text class="title" x="56" y="60">Stage 5 Release Workflow Through Architecture</text>
+  <text class="note" x="56" y="86">User workflow stays live; release workflow controls how new code safely reaches ECS.</text>
+
+  <rect class="side" x="55" y="145" width="1170" height="225" />
+  <text class="label" x="82" y="179">Release path</text>
+
+  <g transform="translate(90,230)"><rect class="box" width="120" height="78" /><circle class="bubble" cx="22" cy="22" r="14" /><text class="num" x="18" y="27">1</text><text class="label" x="48" y="32">Commit</text><text class="small" x="48" y="55">code change</text></g>
+  <g transform="translate(260,230)"><rect class="ops" width="135" height="78" /><circle class="bubble" cx="22" cy="22" r="14" /><text class="num" x="18" y="27">2</text><text class="label" x="48" y="32">CI Tests</text><text class="small" x="48" y="55">app checks</text></g>
+  <g transform="translate(445,230)"><rect class="ops" width="140" height="78" /><circle class="bubble" cx="22" cy="22" r="14" /><text class="num" x="18" y="27">3</text><text class="label" x="48" y="32">Build</text><text class="small" x="48" y="55">Docker image</text></g>
+  <g transform="translate(635,230)"><rect class="aws" width="125" height="78" /><circle class="bubble" cx="22" cy="22" r="14" /><text class="num" x="18" y="27">4</text><text class="label" x="48" y="32">ECR</text><text class="small" x="48" y="55">push tag</text></g>
+  <g transform="translate(810,230)"><rect class="ops" width="150" height="78" /><circle class="bubble" cx="22" cy="22" r="14" /><text class="num" x="18" y="27">5</text><text class="label" x="48" y="32">Deploy</text><text class="small" x="48" y="55">ECS update</text></g>
+  <g transform="translate(1010,230)"><rect class="good" width="145" height="78" /><circle class="bubble" cx="22" cy="22" r="14" /><text class="num" x="18" y="27">6</text><text class="label" x="48" y="32">Verify</text><text class="small" x="48" y="55">health + smoke</text></g>
+
+  <path class="arrow" d="M210 269 L260 269" />
+  <path class="arrow" d="M395 269 L445 269" />
+  <path class="arrow" d="M585 269 L635 269" />
+  <path class="arrow" d="M760 269 L810 269" />
+  <path class="arrow" d="M960 269 L1010 269" />
+
+  <rect class="side" x="55" y="430" width="1170" height="185" />
+  <text class="label" x="82" y="464">User path during release</text>
+  <text class="tiny" x="82" y="486">The public endpoint should remain stable while ECS rolls from the old task version to the new one.</text>
+
+  <rect class="box" x="145" y="530" width="120" height="62" /><text class="label" x="180" y="556">User</text><text class="small" x="174" y="577">same URL</text>
+  <rect class="good" x="345" y="530" width="135" height="62" /><text class="label" x="388" y="556">ALB</text><text class="small" x="368" y="577">routes traffic</text>
+  <rect class="good" x="560" y="510" width="150" height="62" /><text class="label" x="594" y="536">Old Task</text><text class="small" x="595" y="557">serving</text>
+  <rect class="good" x="560" y="590" width="150" height="62" /><text class="label" x="592" y="616">New Task</text><text class="small" x="596" y="637">warming up</text>
+  <rect class="ops" x="800" y="530" width="160" height="62" /><text class="label" x="829" y="556">Rollback</text><text class="small" x="823" y="577">previous tag</text>
+  <rect class="aws" x="1040" y="530" width="135" height="62" /><text class="label" x="1078" y="556">Logs</text><text class="small" x="1060" y="577">deploy evidence</text>
+
+  <path class="arrow" d="M265 561 L345 561" />
+  <path class="arrow" d="M480 561 L560 541" />
+  <path class="dash" d="M480 561 L560 621" />
+  <path class="dash" d="M710 621 L800 561" />
+  <path class="dash" d="M960 561 L1040 561" />
+  <path class="dash" d="M880 530 C875 430, 890 350, 885 308" />
+
+  <text class="tiny" x="55" y="704">Stage 5 is complete when releases are repeatable, image tags are immutable, health checks gate deployment, and rollback is documented/tested.</text>
+</svg>

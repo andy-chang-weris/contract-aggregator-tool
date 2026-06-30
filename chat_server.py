@@ -1,4 +1,4 @@
-﻿"""Isolated local chat API for the interactive UI prototype.
+"""Isolated local chat API for the interactive UI prototype.
 
 Run from the agent directory:
     python interactive-ui/chat_server.py
@@ -94,4 +94,5 @@ def chat():
 
 if __name__ == "__main__":
     port = int(os.getenv("CHAT_SERVER_PORT", "5055"))
-    app.run(host="127.0.0.1", port=port, debug=False)
+    host = os.getenv("CHAT_SERVER_HOST", "127.0.0.1")
+    app.run(host=host, port=port, debug=False)

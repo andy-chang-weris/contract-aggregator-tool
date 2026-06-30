@@ -1,0 +1,80 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760">
+  <defs>
+    <style>
+      .bg { fill: #ffffff; }
+      .title { font: 700 28px Arial, sans-serif; fill: #111827; }
+      .note { font: 14px Arial, sans-serif; fill: #6b7280; }
+      .group { fill: #f9fafb; stroke: #d1d5db; stroke-width: 2; rx: 18; }
+      .svc { fill: #ffffff; stroke: #111827; stroke-width: 2; rx: 12; }
+      .aws { fill: #fff7ed; stroke: #fb923c; stroke-width: 2; rx: 12; }
+      .data { fill: #eff6ff; stroke: #3b82f6; stroke-width: 2; rx: 12; }
+      .good { fill: #ecfdf5; stroke: #10b981; stroke-width: 2; rx: 12; }
+      .ops { fill: #f5f3ff; stroke: #8b5cf6; stroke-width: 2; rx: 12; }
+      .private { fill: #f0f9ff; stroke: #0284c7; stroke-width: 2; rx: 12; }
+      .label { font: 700 16px Arial, sans-serif; fill: #111827; }
+      .small { font: 13px Arial, sans-serif; fill: #374151; }
+      .tiny { font: 12px Arial, sans-serif; fill: #6b7280; }
+      .arrow { stroke: #111827; stroke-width: 2.2; fill: none; marker-end: url(#arrow); }
+      .dash { stroke: #6b7280; stroke-width: 2; fill: none; stroke-dasharray: 7 6; marker-end: url(#arrow-gray); }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M1,1 L9,5 L1,9 Z" fill="#111827" /></marker>
+    <marker id="arrow-gray" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M1,1 L9,5 L1,9 Z" fill="#6b7280" /></marker>
+  </defs>
+
+  <rect class="bg" width="1280" height="760" />
+  <text class="title" x="56" y="60">Stage 5 Minimal Architecture</text>
+  <text class="note" x="56" y="86">Release safety layer: CI builds immutable images, Terraform is planned/applied through a controlled workflow, and ECS deploys known versions.</text>
+
+  <rect class="group" x="55" y="145" width="520" height="460" />
+  <text class="label" x="85" y="180">Delivery System</text>
+
+  <rect class="svc" x="100" y="235" width="125" height="70" />
+  <text class="label" x="134" y="264">Git</text>
+  <text class="small" x="121" y="286">app + infra</text>
+
+  <rect class="ops" x="280" y="235" width="145" height="70" />
+  <text class="label" x="301" y="264">CI Pipeline</text>
+  <text class="small" x="305" y="286">test/build/plan</text>
+
+  <rect class="aws" x="100" y="380" width="145" height="70" />
+  <text class="label" x="145" y="409">ECR</text>
+  <text class="small" x="123" y="431">immutable tag</text>
+
+  <rect class="ops" x="300" y="380" width="150" height="70" />
+  <text class="label" x="326" y="409">Terraform</text>
+  <text class="small" x="323" y="431">remote state</text>
+
+  <rect class="group" x="650" y="145" width="570" height="460" />
+  <text class="label" x="680" y="180">Runtime System</text>
+
+  <rect class="good" x="700" y="235" width="145" height="70" />
+  <text class="label" x="735" y="264">ALB</text>
+  <text class="small" x="720" y="286">stable HTTPS</text>
+
+  <rect class="private" x="910" y="235" width="155" height="70" />
+  <text class="label" x="946" y="264">ECS App</text>
+  <text class="small" x="931" y="286">deployed tag</text>
+
+  <rect class="data" x="700" y="380" width="145" height="70" />
+  <text class="label" x="739" y="409">RDS</text>
+  <text class="small" x="718" y="431">persistent data</text>
+
+  <rect class="aws" x="910" y="380" width="155" height="70" />
+  <text class="label" x="939" y="409">CloudWatch</text>
+  <text class="small" x="945" y="431">logs/metrics</text>
+
+  <rect class="svc" x="530" y="650" width="220" height="54" />
+  <text class="label" x="576" y="682">Rollback path</text>
+
+  <path class="arrow" d="M225 270 L280 270" />
+  <path class="arrow" d="M352 305 L172 380" />
+  <path class="arrow" d="M425 270 C510 270, 560 410, 650 415" />
+  <path class="arrow" d="M245 415 L300 415" />
+  <path class="arrow" d="M450 415 C590 415, 750 315, 910 270" />
+  <path class="arrow" d="M845 270 L910 270" />
+  <path class="dash" d="M987 305 L987 380" />
+  <path class="dash" d="M987 305 C890 350, 820 380, 772 380" />
+  <path class="dash" d="M640 650 C720 560, 845 430, 987 305" />
+
+  <text class="tiny" x="56" y="700">Stage 5 does not change the user path. It changes how code and infrastructure changes are promoted, audited, deployed, and rolled back.</text>
+</svg>

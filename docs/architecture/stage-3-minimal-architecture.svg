@@ -1,0 +1,94 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760">
+  <defs>
+    <style>
+      .bg { fill: #ffffff; }
+      .title { font: 700 28px Arial, sans-serif; fill: #111827; }
+      .note { font: 14px Arial, sans-serif; fill: #6b7280; }
+      .group { fill: #f9fafb; stroke: #d1d5db; stroke-width: 2; rx: 18; }
+      .subnet { fill: #ffffff; stroke: #9ca3af; stroke-width: 1.5; rx: 14; }
+      .svc { fill: #ffffff; stroke: #111827; stroke-width: 2; rx: 12; }
+      .aws { fill: #fff7ed; stroke: #fb923c; stroke-width: 2; rx: 12; }
+      .data { fill: #eff6ff; stroke: #3b82f6; stroke-width: 2; rx: 12; }
+      .net { fill: #ecfdf5; stroke: #10b981; stroke-width: 2; rx: 12; }
+      .ops { fill: #f5f3ff; stroke: #8b5cf6; stroke-width: 2; rx: 12; }
+      .secure { fill: #f0fdf4; stroke: #16a34a; stroke-width: 2; rx: 12; }
+      .label { font: 700 16px Arial, sans-serif; fill: #111827; }
+      .small { font: 13px Arial, sans-serif; fill: #374151; }
+      .tiny { font: 12px Arial, sans-serif; fill: #6b7280; }
+      .arrow { stroke: #111827; stroke-width: 2.2; fill: none; marker-end: url(#arrow); }
+      .dash { stroke: #6b7280; stroke-width: 2; fill: none; stroke-dasharray: 7 6; marker-end: url(#arrow-gray); }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M1,1 L9,5 L1,9 Z" fill="#111827" />
+    </marker>
+    <marker id="arrow-gray" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M1,1 L9,5 L1,9 Z" fill="#6b7280" />
+    </marker>
+  </defs>
+
+  <rect class="bg" width="1280" height="760" />
+  <text class="title" x="56" y="60">Stage 3 Minimal Architecture</text>
+  <text class="note" x="56" y="86">Reliability and operations on top of Stage 2: multiple healthy tasks, autoscaling, alarms, dashboards, and database backups.</text>
+
+  <rect class="svc" x="48" y="330" width="120" height="72" />
+  <text class="label" x="78" y="360">Users</text>
+  <text class="small" x="72" y="384">Browser</text>
+
+  <rect class="aws" x="198" y="330" width="120" height="72" />
+  <text class="label" x="232" y="360">DNS</text>
+  <text class="small" x="219" y="384">Route 53</text>
+
+  <rect class="net" x="348" y="330" width="145" height="72" />
+  <text class="label" x="378" y="360">Internet</text>
+  <text class="small" x="390" y="384">Gateway</text>
+
+  <rect class="secure" x="525" y="330" width="160" height="72" />
+  <text class="label" x="568" y="360">ALB</text>
+  <text class="small" x="550" y="384">HTTPS :443</text>
+
+  <rect class="group" x="725" y="125" width="360" height="520" />
+  <text class="label" x="755" y="160">ECS Service</text>
+  <text class="tiny" x="848" y="160">desired count 2+, multi-AZ</text>
+
+  <rect class="subnet" x="755" y="205" width="130" height="235" />
+  <text class="label" x="781" y="235">AZ A</text>
+  <rect class="svc" x="775" y="280" width="90" height="62" />
+  <text class="small" x="795" y="305">Task</text>
+  <text class="tiny" x="790" y="325">healthy</text>
+
+  <rect class="subnet" x="925" y="205" width="130" height="235" />
+  <text class="label" x="951" y="235">AZ B</text>
+  <rect class="svc" x="945" y="280" width="90" height="62" />
+  <text class="small" x="965" y="305">Task</text>
+  <text class="tiny" x="960" y="325">healthy</text>
+
+  <rect class="ops" x="795" y="490" width="220" height="70" />
+  <text class="label" x="842" y="520">Autoscaling</text>
+  <text class="small" x="828" y="542">CPU / memory / requests</text>
+
+  <rect class="data" x="1125" y="280" width="120" height="88" />
+  <text class="label" x="1158" y="312">RDS</text>
+  <text class="small" x="1138" y="334">PostgreSQL</text>
+  <text class="tiny" x="1145" y="354">backups on</text>
+
+  <rect class="ops" x="1125" y="420" width="120" height="80" />
+  <text class="label" x="1140" y="450">Alarms</text>
+  <text class="small" x="1144" y="472">5xx / health</text>
+  <text class="tiny" x="1148" y="490">RDS / ECS</text>
+
+  <rect class="ops" x="1125" y="545" width="120" height="72" />
+  <text class="label" x="1132" y="575">Dashboard</text>
+  <text class="small" x="1140" y="597">service view</text>
+
+  <path class="arrow" d="M168 366 L198 366" />
+  <path class="arrow" d="M318 366 L348 366" />
+  <path class="arrow" d="M493 366 L525 366" />
+  <path class="arrow" d="M685 366 L775 312" />
+  <path class="arrow" d="M685 366 L945 312" />
+  <path class="arrow" d="M1035 315 L1125 324" />
+  <path class="dash" d="M865 342 C920 440, 960 490, 1015 525" />
+  <path class="dash" d="M990 342 C1045 410, 1085 445, 1125 460" />
+  <path class="dash" d="M1185 500 L1185 545" />
+
+  <text class="tiny" x="56" y="695">Stage 3 preserves the Stage 2 HTTPS entry point, then adds resilience: at least two tasks, health-based replacement, scaling policy, alarms, and DB backup posture.</text>
+</svg>

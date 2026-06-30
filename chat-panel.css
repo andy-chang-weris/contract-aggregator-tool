@@ -1,6 +1,8 @@
-﻿.chat-panel-root {
+.chat-panel-root {
   width: min(420px, 100%);
   align-self: flex-end;
+  grid-area: main;
+  justify-self: end;
   position: sticky;
   bottom: 1rem;
   z-index: 40;

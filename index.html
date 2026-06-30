@@ -582,7 +582,6 @@
         return;
       }
       endpoint = `${base}/api/clients/${CLIENT_ID}/ranked-opportunities`;
-      params.set('candidateLimit', 1000);
       params.set('excludeNegativeFeedback', 'true');
     } else {
       params.set('sortBy', sortField);

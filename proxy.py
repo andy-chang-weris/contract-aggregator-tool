@@ -542,7 +542,6 @@ def ranked_opportunities(client_id):
 
     limit  = max(1, min(int(request.args.get("limit", 20)), 1000))
     offset = max(0, int(request.args.get("offset", 0)))
-    candidate_limit = max(1, min(int(request.args.get("candidateLimit", 1000)), 5000))
     exclude_negative = parse_bool(request.args.get("excludeNegativeFeedback"), default=False)
 
     agency        = (request.args.get("agency")       or "").strip()
@@ -597,9 +596,7 @@ def ranked_opportunities(client_id):
                 place_of_performance, url, date_scraped
             FROM postings
             {where}
-            ORDER BY date_scraped DESC
-            LIMIT %s
-        """, params + [candidate_limit])
+        """, params)
         candidates = [dict(r) for r in cursor.fetchall()]
         cursor.close(); conn.close()
 

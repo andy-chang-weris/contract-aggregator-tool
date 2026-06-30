@@ -1,7 +1,12 @@
-name: Terraform AWS Infra
+name: Infrastructure
 
 on:
   workflow_dispatch:
+
+  push:
+    paths:
+      - "terraform/**"
+      - ".github/workflows/infra.yml"
 
 permissions:
   id-token: write
@@ -31,10 +36,15 @@ jobs:
         working-directory: terraform
         run: terraform init
 
+      - name: Terraform Validate
+        working-directory: terraform
+        run: terraform validate
+
       - name: Terraform Plan
         working-directory: terraform
         run: terraform plan
 
       - name: Terraform Apply
+        if: github.ref == 'refs/heads/main'
         working-directory: terraform
         run: terraform apply -auto-approve

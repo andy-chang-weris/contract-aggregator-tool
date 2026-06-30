@@ -31,23 +31,13 @@ CACHE_TTL_SECONDS = 3600
 _cache = {}
 
 VALID_FEEDBACK_ACTIONS = {
-    "viewed",
-    "clicked",
-    "saved",
-    "not_interested",
-    "highly_relevant",
-    "applied",
-    "dismissed",
+    "like", 
+    "dislike"
 }
 
 ACTION_WEIGHTS = {
-    "viewed": 0.1,
-    "clicked": 0.5,
-    "saved": 1.0,
-    "highly_relevant": 2.0,
-    "applied": 3.0,
-    "not_interested": -1.5,
-    "dismissed": -1.0,
+    "like": 1.0,
+    "dislike": -1.0,
 }
 
 

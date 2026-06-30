@@ -467,7 +467,7 @@
         }, 1200);
       }
 
-      if (action === 'not_interested' || action === 'dismissed') {
+      if (action === 'dislike') {
         currentItems = currentItems.filter(item => Number(item.id) !== Number(postingId));
         renderResults(currentItems, currentTotal, currentOffset);
       }
@@ -528,8 +528,7 @@
             ? `<a href="${escHtml(c.url || c.link)}"
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="view-link"
-                  onclick="sendFeedback(${Number(c.id) || 0}, 'clicked', null, { url: this.href })">
+                  class="view-link">
                   <i class="ti ti-external-link" aria-hidden="true"></i>View posting
                </a>`
             : ''}
@@ -538,18 +537,13 @@
         ${renderDescription(c)}
         <div class="feedback-row">
           <button class="feedback-btn positive"
-                  onclick="sendFeedback(${Number(c.id) || 0}, 'highly_relevant', this)">
-            <i class="ti ti-thumb-up" aria-hidden="true"></i> Good match
+                  onclick="sendFeedback(${Number(c.id) || 0}, 'like', this)">
+            <i class="ti ti-thumb-up" aria-hidden="true"></i> Like
           </button>
-
-          <button class="feedback-btn positive"
-                  onclick="sendFeedback(${Number(c.id) || 0}, 'saved', this)">
-            <i class="ti ti-bookmark" aria-hidden="true"></i> Save
-          </button>
-
+        
           <button class="feedback-btn negative"
-                  onclick="sendFeedback(${Number(c.id) || 0}, 'not_interested', this)">
-            <i class="ti ti-thumb-down" aria-hidden="true"></i> Not interested
+                  onclick="sendFeedback(${Number(c.id) || 0}, 'dislike', this)">
+            <i class="ti ti-thumb-down" aria-hidden="true"></i> Dislike
           </button>
         </div>
       </div>`;

@@ -158,28 +158,17 @@ class RawRecord:
     weight: float = 1.0  # optional sample weight, e.g. from rating
 
 
-POSITIVE_ACTIONS = {"saved", "highly_relevant", "applied"}
-NEGATIVE_ACTIONS = {"not_interested", "dismissed"}
-NEUTRAL_ACTIONS = {"viewed"}  # excluded by default
-CLICK_ACTION = "clicked"  # ambiguous; counted positive only if include_clicks=True
+POSITIVE_ACTIONS = {"like"}
+NEGATIVE_ACTIONS = {"dislike"}
+NEUTRAL_ACTIONS = set()
+CLICK_ACTION = None  # remove the ambiguous-click special case entirely
 
 
 def label_for_action(action: str, rating: int | None, include_clicks: bool) -> int | None:
-    """Map a client_feedback action (+ optional rating) to a binary label.
-    Returns None if the action should be excluded from training."""
-    if action in NEUTRAL_ACTIONS:
-        return None
-    if action in POSITIVE_ACTIONS:
+    if action == "like":
         return 1
-    if action in NEGATIVE_ACTIONS:
+    if action == "dislike":
         return 0
-    if action == CLICK_ACTION:
-        if not include_clicks:
-            return None
-        # A bare click is weak positive signal unless contradicted by rating.
-        if rating is not None and rating <= 2:
-            return 0
-        return 1
     return None
 
 

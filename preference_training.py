@@ -23,19 +23,9 @@ except Exception:  # pragma: no cover - lets proxy.py import with its own factor
     get_connection = None
 
 
-POSITIVE_ACTION_WEIGHTS = {
-    "clicked": 0.35,
-    "saved": 1.25,
-    "highly_relevant": 2.0,
-    "applied": 3.0,
-}
-
-NEGATIVE_ACTION_WEIGHTS = {
-    "not_interested": -1.5,
-    "dismissed": -1.0,
-}
-
-IGNORED_ACTIONS = {"viewed"}
+POSITIVE_ACTION_WEIGHTS = {"like": 1.0}
+NEGATIVE_ACTION_WEIGHTS = {"dislike": -1.0}
+IGNORED_ACTIONS = set()  # nothing left to ignore
 
 STOPWORDS = {
     "about", "above", "after", "again", "agency", "all", "also", "and",

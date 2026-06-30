@@ -192,13 +192,8 @@ def setup_ml_tables():
 
             action TEXT NOT NULL CHECK (
                 action IN (
-                    'viewed',
-                    'clicked',
-                    'saved',
-                    'not_interested',
-                    'highly_relevant',
-                    'applied',
-                    'dismissed'
+                   'like', 
+                   'dislike'
                 )
             ),
 

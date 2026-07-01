@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-SAM.gov parser — Virginia contracts only, allowed types + allowed NAICS only.
+SAM.gov parser — allowed types + allowed NAICS only.
 
 LOCAL MODE: reads from sam_opportunities.csv
-LIVE MODE:  calls SAM.gov API directly with state=VA filter.
+LIVE MODE:  calls SAM.gov API directly.
 """
 
 import os
@@ -58,15 +58,6 @@ def is_allowed_naics(naics: str | None) -> bool:
     if not naics:
         return False
     return naics.strip() in ALLOWED_NAICS
-
-# ── Virginia matching ─────────────────────────────────────────────────────────
-VIRGINIA_TERMS = {"VA", "VIRGINIA"}
-
-def is_virginia(place: str | None) -> bool:
-    if not place:
-        return False
-    p = place.strip().upper()
-    return p in VIRGINIA_TERMS or "VIRGINIA" in p
 
 # ── Type mapping ──────────────────────────────────────────────────────────────
 TYPE_LABELS = {
@@ -201,11 +192,6 @@ def load_from_csv(filepath=LOCAL_CSV_FILE):
         print(f"  [sam_gov] Could not load CSV: {e}")
         return []
 
-    # Virginia filter
-    before = len(records)
-    records = [r for r in records if is_virginia(r.get("place_of_performance"))]
-    print(f"  [sam_gov] Virginia filter: {before:,} → {len(records):,} records.")
-
     # Contract type filter
     before = len(records)
     records = [r for r in records if is_allowed_type_sam(r.get("award_status"))]
@@ -238,11 +224,6 @@ def load_from_json(filepath=LOCAL_JSON_FILE):
     except Exception as e:
         print(f"  [sam_gov] Could not load JSON: {e}")
         return []
-
-    # Virginia filter
-    before = len(records)
-    records = [r for r in records if is_virginia(r.get("place_of_performance"))]
-    print(f"  [sam_gov] Virginia filter: {before:,} → {len(records):,} records.")
 
     # Contract type filter
     before = len(records)
@@ -277,7 +258,6 @@ def fetch_from_api(posted_from="01/01/2026", posted_to=None, limit=1000):
             "postedTo":   posted_to,
             "limit":      limit,
             "offset":     offset,
-            "state":      "VA",
         }
 
         print(f"  [sam_gov] Fetching offset {offset}...")
@@ -295,8 +275,7 @@ def fetch_from_api(posted_from="01/01/2026", posted_to=None, limit=1000):
         for item in items:
             try:
                 record = normalize_json_record(item)
-                if (is_virginia(record.get("place_of_performance"))
-                        and is_allowed_type_sam(record.get("award_status"))
+                if (is_allowed_type_sam(record.get("award_status"))
                         and is_allowed_naics(record.get("naics"))):
                     all_records.append(record)
             except Exception as e:
@@ -307,7 +286,7 @@ def fetch_from_api(posted_from="01/01/2026", posted_to=None, limit=1000):
 
         offset += limit
         if offset >= total:
-            print(f"  [sam_gov] Done. {len(all_records):,} Virginia + allowed-type + allowed-NAICS records fetched.")
+            print(f"  [sam_gov] Done. {len(all_records):,} allowed-type + allowed-NAICS records fetched.")
             break
 
         time.sleep(1)

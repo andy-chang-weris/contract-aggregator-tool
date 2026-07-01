@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Acquisition Gateway Forecast parser — Virginia contracts, allowed types + allowed NAICS only.
+Acquisition Gateway Forecast parser — allowed types + allowed NAICS only.
 """
 
 import requests
@@ -60,16 +60,6 @@ def parse_unix_date(value):
         return datetime.fromtimestamp(int(value), tz=timezone.utc).strftime("%Y-%m-%d")
     except (ValueError, TypeError, OSError):
         return None
-
-# ── Virginia matching ─────────────────────────────────────────────────────────
-def is_virginia(place: str | None) -> bool:
-    if not place:
-        return False
-    p = place.strip().upper()
-    return (
-        "VIRGINIA" in p
-        or re.search(r'\bVA\b', p) is not None
-    )
 
 
 def clean_html(text):
@@ -136,7 +126,7 @@ def fetch_page(page_number):
 
 
 def fetch_and_parse():
-    """Fetch all pages, return only Virginia + allowed-type + allowed-NAICS postings."""
+    """Fetch all pages, return only allowed-type + allowed-NAICS postings."""
     all_postings = []
     page = 1
 
@@ -172,11 +162,6 @@ def fetch_and_parse():
         page += 1
         time.sleep(0.2)
         _, listings = fetch_page(page)
-
-    # Virginia filter
-    before = len(all_postings)
-    all_postings = [p for p in all_postings if is_virginia(p.get("place_of_performance"))]
-    print(f"  [acq_gateway] Virginia filter: {before:,} → {len(all_postings):,} records.")
 
     # Contract type filter
     before = len(all_postings)

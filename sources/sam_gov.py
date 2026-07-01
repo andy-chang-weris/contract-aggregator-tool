@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-SAM.gov parser — allowed types + allowed NAICS only.
+SAM.gov parser — allowed agencies + allowed types + allowed NAICS only.
 
 LOCAL MODE: reads from sam_opportunities.csv
 LIVE MODE:  calls SAM.gov API directly.
@@ -22,6 +22,33 @@ except ImportError:
 SAM_BASE_URL    = "https://api.sam.gov/opportunities/v2/search"
 LOCAL_CSV_FILE  = "sam_opportunities.csv"
 LOCAL_JSON_FILE = "sam_opportunities.json"
+
+# ── Allowed agencies ──────────────────────────────────────────────────────────
+# Only store contracts posted by one of these agencies (matched against the
+# combined agency/organization text, case-insensitive substring match).
+# Mirrors the agency filter exposed in the UI.
+AGENCY_KEYWORDS = {
+    "DOT":   ["DEPARTMENT OF TRANSPORTATION"],
+    "DHS":   ["DEPARTMENT OF HOMELAND SECURITY", "HOMELAND SECURITY"],
+    "FHWA":  ["FEDERAL HIGHWAY"],
+    "FRA":   ["FEDERAL RAILROAD"],
+    "FMCSA": ["FEDERAL MOTOR CARRIER SAFETY"],
+    "FAA":   ["FEDERAL AVIATION"],
+    "CBP":   ["CUSTOMS AND BORDER PROTECTION", "CUSTOMS & BORDER PROTECTION"],
+    "NHTSA": ["NATIONAL HIGHWAY TRAFFIC SAFETY"],
+    "TSA":   ["TRANSPORTATION SECURITY"],
+    "FEMA":  ["FEDERAL EMERGENCY MANAGEMENT"],
+}
+
+def is_allowed_agency(agency: str | None, organization: str | None = None) -> bool:
+    text = f"{agency or ''} {organization or ''}".upper()
+    if not text.strip():
+        return False
+    return any(
+        keyword in text
+        for keywords in AGENCY_KEYWORDS.values()
+        for keyword in keywords
+    )
 
 # ── Allowed contract types ────────────────────────────────────────────────────
 # Only store these types — all others skipped at parse time
@@ -192,6 +219,11 @@ def load_from_csv(filepath=LOCAL_CSV_FILE):
         print(f"  [sam_gov] Could not load CSV: {e}")
         return []
 
+    # Agency filter
+    before = len(records)
+    records = [r for r in records if is_allowed_agency(r.get("agency"), r.get("organization"))]
+    print(f"  [sam_gov] Agency filter: {before:,} → {len(records):,} records.")
+
     # Contract type filter
     before = len(records)
     records = [r for r in records if is_allowed_type_sam(r.get("award_status"))]
@@ -224,6 +256,11 @@ def load_from_json(filepath=LOCAL_JSON_FILE):
     except Exception as e:
         print(f"  [sam_gov] Could not load JSON: {e}")
         return []
+
+    # Agency filter
+    before = len(records)
+    records = [r for r in records if is_allowed_agency(r.get("agency"), r.get("organization"))]
+    print(f"  [sam_gov] Agency filter: {before:,} → {len(records):,} records.")
 
     # Contract type filter
     before = len(records)
@@ -275,7 +312,8 @@ def fetch_from_api(posted_from="01/01/2026", posted_to=None, limit=1000):
         for item in items:
             try:
                 record = normalize_json_record(item)
-                if (is_allowed_type_sam(record.get("award_status"))
+                if (is_allowed_agency(record.get("agency"), record.get("organization"))
+                        and is_allowed_type_sam(record.get("award_status"))
                         and is_allowed_naics(record.get("naics"))):
                     all_records.append(record)
             except Exception as e:
@@ -286,7 +324,7 @@ def fetch_from_api(posted_from="01/01/2026", posted_to=None, limit=1000):
 
         offset += limit
         if offset >= total:
-            print(f"  [sam_gov] Done. {len(all_records):,} allowed-type + allowed-NAICS records fetched.")
+            print(f"  [sam_gov] Done. {len(all_records):,} allowed-agency + allowed-type + allowed-NAICS records fetched.")
             break
 
         time.sleep(1)

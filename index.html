@@ -68,7 +68,7 @@
     <!-- Source filter -->
     <div class="field">
       <label for="f-source">Data source</label>
-      <select id="f-source" onchange="scopeContractTypes()">
+      <select id="f-source" onchange="scopeContractTypes(); scopeAgencies();">
         <option value="">All sources</option>
         <option value="SAM.gov">SAM.gov</option>
         <option value="Acquisition Gateway Forecast">Acquisition Gateway</option>
@@ -109,16 +109,36 @@
       <label for="f-org">Agency / organization</label>
       <select id="f-org">
         <option value="">All agencies</option>
-        <option value="DEPARTMENT OF TRANSPORTATION">DOT — Dept. of Transportation</option>
-        <option value="HOMELAND SECURITY">DHS — Dept. of Homeland Security</option>
-        <option value="FEDERAL HIGHWAY">FHWA — Federal Highway Admin.</option>
-        <option value="FEDERAL RAILROAD">FRA — Federal Railroad Admin.</option>
-        <option value="FEDERAL MOTOR CARRIER SAFETY">FMCSA — Federal Motor Carrier Safety Admin.</option>
-        <option value="FEDERAL AVIATION">FAA — Federal Aviation Admin.</option>
-        <option value="CUSTOMS AND BORDER PROTECTION">CBP — Customs and Border Protection</option>
-        <option value="NATIONAL HIGHWAY TRAFFIC SAFETY">NHTSA — Natl. Highway Traffic Safety Admin.</option>
-        <option value="TRANSPORTATION SECURITY">TSA — Transportation Security Admin.</option>
-        <option value="FEDERAL EMERGENCY MANAGEMENT">FEMA — Federal Emergency Management Agency</option>
+
+        <optgroup label="Federal">
+          <option value="DEPARTMENT OF TRANSPORTATION">DOT — Dept. of Transportation</option>
+          <option value="HOMELAND SECURITY">DHS — Dept. of Homeland Security</option>
+          <option value="FEDERAL HIGHWAY">FHWA — Federal Highway Admin.</option>
+          <option value="FEDERAL RAILROAD">FRA — Federal Railroad Admin.</option>
+          <option value="FEDERAL MOTOR CARRIER SAFETY">FMCSA — Federal Motor Carrier Safety Admin.</option>
+          <option value="FEDERAL AVIATION">FAA — Federal Aviation Admin.</option>
+          <option value="CUSTOMS AND BORDER PROTECTION">CBP — Customs and Border Protection</option>
+          <option value="NATIONAL HIGHWAY TRAFFIC SAFETY">NHTSA — Natl. Highway Traffic Safety Admin.</option>
+          <option value="TRANSPORTATION SECURITY">TSA — Transportation Security Admin.</option>
+          <option value="FEDERAL EMERGENCY MANAGEMENT">FEMA — Federal Emergency Management Agency</option>
+        </optgroup>
+
+        <optgroup label="State">
+          <option value="VIRGINIA DEPARTMENT OF TRANSPORTATION">VDOT - Virginia Dept. of Transportation</option>
+          <option value="FAIRFAX">Fairfax County</option>
+          <option value="ARLINGTON">Arlington County</option>
+          <option value="LOUDOUN">Loudoun County</option>
+          <option value="PRINCE WILLIAM">Prince William County</option>
+          <option value="ALEXANDRIA">City of Alexandria</option>
+          <option value="FALLS CHURCH">City of Falls Church</option>
+          <option value="MANASSAS">City of Manassas / Manassas Park</option>
+          <option value="HERNDON">Town of Herndon</option>
+          <option value="VIENNA">Town of Vienna</option>
+          <option value="PURCELLVILLE">Town of Purcellville</option>
+          <option value="LEESBURG">Town of Leesburg</option>
+          <option value="DUMFRIES">Town of Dumfries</option>
+        </optgroup>
+
       </select>
     </div>
 
@@ -231,6 +251,36 @@
     }
   }
 
+  /* ── Agency scoping (Federal vs State by source) ──────────── */
+  // Maps f-source option values to the agency optgroup they should expose.
+  // SAM.gov and Acquisition Gateway are federal sources; Virginia eVA is state.
+  const SOURCE_TO_AGENCY_GROUP = {
+    'SAM.gov':                      'Federal',
+    'Acquisition Gateway Forecast': 'Federal',
+    'Virginia eVA':                 'State',
+  };
+
+  function scopeAgencies() {
+    const source      = document.getElementById('f-source').value;
+    const orgEl       = document.getElementById('f-org');
+    const activeLabel = SOURCE_TO_AGENCY_GROUP[source] || null;
+
+    orgEl.querySelectorAll('optgroup').forEach(group => {
+      const visible = activeLabel === null || group.label === activeLabel;
+      group.style.display = visible ? '' : 'none';
+      group.querySelectorAll('option').forEach(opt => {
+        opt.disabled = !visible;
+      });
+    });
+
+    // If the currently selected agency belongs to a now-hidden group, reset it
+    const selected = orgEl.options[orgEl.selectedIndex];
+    if (selected && selected.parentElement.tagName === 'OPTGROUP' &&
+        selected.parentElement.style.display === 'none') {
+      orgEl.value = '';
+    }
+  }
+
   /* ── Clear filters ────────────────────────────────────────── */
   function clearFilters() {
     document.getElementById('f-source').value = '';
@@ -239,6 +289,7 @@
     selectedNaics.clear();
     document.querySelectorAll('.naics-tag.selected').forEach(t => t.classList.remove('selected'));
     scopeContractTypes();
+    scopeAgencies();
   }
 
   /* ── Proxy health check ───────────────────────────────────── */

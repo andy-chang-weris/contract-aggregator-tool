@@ -40,6 +40,39 @@ ACTION_WEIGHTS = {
     "dislike": -1.0,
 }
 
+# ── Agency filter word-order variants ──────────────────────────────────────
+# Different sources format the same agency name differently:
+#   SAM.gov inverts it:            "TRANSPORTATION, DEPARTMENT OF"
+#   Acquisition Gateway uses:      "Department of Transportation"
+#   eVA (Virginia) uses, for VDOT: "Virginia Department of Transportation"
+# A single ILIKE substring match on the UI's dropdown value cannot match
+# both word orders at once, so each filterable agency value is mapped to
+# every known variant, and the query becomes an OR across all of them.
+# NOTE: only the DOT entry below has been confirmed against user-reported
+# real values for all three sources. Other agencies in
+# sources/sam_gov.py's AGENCY_KEYWORDS (DHS, FHWA, FRA, FMCSA, FAA, CBP,
+# NHTSA, TSA, FEMA) have not been individually checked against
+# Acquisition Gateway / eVA formatting and may need the same treatment.
+AGENCY_FILTER_VARIANTS = {
+    "DEPARTMENT OF TRANSPORTATION": [
+        "DEPARTMENT OF TRANSPORTATION",   # Acquisition Gateway; also matches
+                                           # "...Department of Transportation"
+                                           # inside eVA's "Virginia Department
+                                           # of Transportation"
+        "TRANSPORTATION, DEPARTMENT OF",  # SAM.gov
+    ],
+}
+
+
+def build_agency_condition(agency: str, conditions: list, params: list) -> None:
+    """Append an agency WHERE clause that matches every known word-order
+    variant for the given filter value via OR, instead of a single
+    substring match that only fits one source's formatting."""
+    variants = AGENCY_FILTER_VARIANTS.get(agency.upper(), [agency])
+    clause = " OR ".join(["agency ILIKE %s"] * len(variants))
+    conditions.append(f"({clause})")
+    params.extend(f"%{v}%" for v in variants)
+
 
 def parse_uuid(value, field_name):
     try:
@@ -162,8 +195,7 @@ def opportunities():
     params     = []
 
     if agency:
-        conditions.append("agency ILIKE %s")
-        params.append(f"%{agency}%")
+        build_agency_condition(agency, conditions, params)
     if naics_list:
         placeholders = ",".join(["%s"] * len(naics_list))
         conditions.append(f"naics IN ({placeholders})")
@@ -546,7 +578,7 @@ def ranked_opportunities(client_id):
 
     conditions, params = [], []
     if agency:
-        conditions.append("agency ILIKE %s"); params.append(f"%{agency}%")
+        build_agency_condition(agency, conditions, params)
     if naics_list:
         placeholders = ",".join(["%s"] * len(naics_list))
         conditions.append(f"naics IN ({placeholders})"); params.extend(naics_list)

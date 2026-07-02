@@ -730,6 +730,17 @@ def ml_model_status_endpoint(client_id):
     except Exception as e:
         return jsonify({"error": f"Could not read model file: {str(e)}"}), 500
 
+@app.route("/api/opportunities/<int:posting_id>")
+def opportunity_detail(posting_id):
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cursor.execute("SELECT * FROM postings WHERE id = %s", (posting_id,))
+    row = cursor.fetchone()
+    cursor.close(); conn.close()
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(dict(row))
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     print(f"\n  GovContracts proxy  → http://localhost:{port}")

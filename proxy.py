@@ -202,6 +202,10 @@ def opportunities():
     contract_type = (request.args.get("contractType") or "").strip()
     source        = (request.args.get("source")       or "").strip()
     split         = (request.args.get("split")        or "").strip()
+    has_summary_raw = request.args.get("hasSummary")
+    has_summary = None
+    if has_summary_raw is not None:
+        has_summary = parse_bool(has_summary_raw, default=True)
 
     sort_by  = (request.args.get("sortBy")  or "").strip()
     sort_dir = (request.args.get("sortDir") or "desc").strip().lower()
@@ -218,7 +222,7 @@ def opportunities():
         "agency": agency, "naics": naics_raw,
         "contractType": contract_type, "source": source,
         "sortBy": sort_by, "sortDir": sort_dir,
-        "split": split,
+        "split": split, "hasSummary": has_summary,
     }, sort_keys=True)
 
     cached = cache_get(cache_key)
@@ -244,6 +248,10 @@ def opportunities():
     if split:
         conditions.append("dataset_split = %s")
         params.append(split)
+    if has_summary is True:
+        conditions.append("ai_summary IS NOT NULL AND ai_summary <> ''")
+    elif has_summary is False:
+        conditions.append("(ai_summary IS NULL OR ai_summary = '')")
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
@@ -264,7 +272,7 @@ def opportunities():
                 source_site, external_id, title, agency, organization,
                 naics, description, posted_date, deadline, award_date,
                 contract_value, award_status, contract_type, acq_strategy,
-                place_of_performance, url, date_scraped
+                place_of_performance, url, date_scraped, ai_summary
             FROM postings
             {where}
             {order}
@@ -889,6 +897,75 @@ def update_contract_summary(posting_id):
         cursor.close(); conn.close()
 
         return jsonify({"status": "ok", "posting": dict(row)})
+
+    except Exception as e:
+        logger.error("Database error in %s: %s", request.path, e)
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@app.route("/api/opportunities/summaries", methods=["PATCH"])
+@limiter.limit("20 per minute")
+def update_contract_summaries_batch():
+    """Batch version of update_contract_summary, so ChatGPT can write many
+    AI summaries in one tool call/confirmation instead of one per contract.
+    NEW ROUTE — did not exist prior to this change."""
+    data = request.get_json(silent=True) or {}
+    items = data.get("summaries")
+
+    if not isinstance(items, list) or not items:
+        return jsonify({"error": "summaries must be a non-empty array"}), 400
+    if len(items) > 200:
+        return jsonify({"error": "summaries array too large (max 200 per call)"}), 400
+
+    parsed = []
+    for i, item in enumerate(items):
+        if not isinstance(item, dict):
+            return jsonify({"error": f"summaries[{i}] must be an object"}), 400
+        try:
+            posting_id = parse_int(item.get("posting_id"), f"summaries[{i}].posting_id")
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+        ai_summary = (item.get("ai_summary") or "").strip()
+        if not ai_summary:
+            return jsonify({"error": f"summaries[{i}].ai_summary is required"}), 400
+        parsed.append((posting_id, ai_summary))
+
+    updated = []
+    skipped = []
+
+    try:
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        for posting_id, ai_summary in parsed:
+            cursor.execute("SELECT id FROM postings WHERE id = %s", (posting_id,))
+            if not cursor.fetchone():
+                skipped.append({"posting_id": posting_id, "reason": "posting_id does not exist"})
+                continue
+
+            cursor.execute("""
+                UPDATE postings
+                SET ai_summary = %s
+                WHERE id = %s
+                RETURNING id, title, ai_summary
+            """, (ai_summary, posting_id))
+            updated.append(dict(cursor.fetchone()))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            "status": "ok",
+            "updated_count": len(updated),
+            "skipped_count": len(skipped),
+            "updated": updated,
+            "skipped": skipped,
+        })
 
     except Exception as e:
         logger.error("Database error in %s: %s", request.path, e)

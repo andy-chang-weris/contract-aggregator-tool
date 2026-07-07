@@ -77,16 +77,21 @@ server.registerTool(
         .boolean()
         .optional()
         .describe("Only applies to sortBy: 'relevance'. Excludes postings the client has disliked."),
+      hasSummary: z
+        .boolean()
+        .optional()
+        .describe("Filter by whether an AI summary has been saved yet. Set false to find contracts still needing a summary."),
       limit: z.number().int().min(1).max(1000).optional().default(20),
       offset: z.number().int().min(0).optional().default(0),
     },
   },
-  async ({ agency, naics, contractType, source, sortBy, sortDir, excludeNegativeFeedback, limit, offset }) => {
+  async ({ agency, naics, contractType, source, sortBy, sortDir, excludeNegativeFeedback, hasSummary, limit, offset }) => {
     const params = new URLSearchParams();
     if (agency) params.set("agency", agency);
     if (naics && naics.length > 0) params.set("naics", naics.join(","));
     if (contractType) params.set("contractType", contractType);
     if (source) params.set("source", source);
+    if (hasSummary !== undefined) params.set("hasSummary", String(hasSummary));
     params.set("limit", String(limit));
     params.set("offset", String(offset));
 
@@ -208,6 +213,60 @@ server.registerTool(
             text: `Could not save summary for contract ${posting_id} (${res.status}): ${JSON.stringify(
               data
             )}. Note: this endpoint may not exist yet on the backend.`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
+// ── save_contract_summaries (batch) ─────────────────────────────────────
+// Batches multiple AI summary writes into one tool call/confirmation,
+// calling PATCH /api/opportunities/summaries. Prefer this over calling
+// save_contract_summary repeatedly when summarizing many contracts at once.
+server.registerTool(
+  "save_contract_summaries",
+  {
+    title: "Save Contract Summaries (Batch)",
+    description:
+      "Save AI-generated plain-language summaries for multiple contract postings in a single call. Use this instead of calling save_contract_summary repeatedly when summarizing many contracts, e.g. after searching with hasSummary: false, so the whole batch only requires one confirmation. Max 200 per call.",
+    annotations: {
+      readOnlyHint: false,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
+    inputSchema: {
+      summaries: z
+        .array(
+          z.object({
+            posting_id: z.number().int().describe("The postings.id value"),
+            ai_summary: z.string().min(1).describe("The plain-language AI-written summary for this contract"),
+          })
+        )
+        .min(1)
+        .max(200)
+        .describe("Array of {posting_id, ai_summary} pairs to write in one batch"),
+    },
+  },
+  async ({ summaries }) => {
+    const res = await fetch(`${BACKEND_URL}/api/opportunities/summaries`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "X-API-Key": API_SHARED_SECRET },
+      body: JSON.stringify({ summaries }),
+    });
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Batch summary save failed (${res.status}): ${JSON.stringify(data)}`,
           },
         ],
         isError: true,

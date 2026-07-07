@@ -435,6 +435,17 @@
       </div>`;
   }
 
+  function renderAiSummary(c) {
+    const summary = (c.ai_summary || '').trim();
+    if (!summary) return '';
+
+    return `
+      <div class="card-ai-summary">
+        <p class="ai-summary-label"><i class="ti ti-sparkles" aria-hidden="true"></i> AI summary</p>
+        <p class="ai-summary-text">${escHtml(summary)}</p>
+      </div>`;
+  }
+
   function toggleDesc(cardId, btn) {
     const container = document.getElementById(cardId);
     if (!container) return;
@@ -623,6 +634,7 @@
         </div>
         ${renderRelevanceReasons(c)}
         ${renderDescription(c)}
+        ${renderAiSummary(c)}
         <div class="feedback-row">
           <button class="feedback-btn positive"
                   ${feedbackDisabled}

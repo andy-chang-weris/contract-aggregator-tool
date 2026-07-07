@@ -25,6 +25,14 @@ import { z } from "zod";
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:5000";
 const PORT = process.env.PORT || 3000;
 
+// Confirmed against agent/interactive-ui/index.html's DEFAULT_CLIENT_ID, and
+// verified as a real working row in the production clients table by a
+// successful POST /api/feedback test earlier in this project (returned
+// feedback.id: 37, status: ok). Overridable via env var if you ever need a
+// different single client without editing code.
+const DEFAULT_CLIENT_ID =
+  process.env.DEFAULT_CLIENT_ID || "9f68f2aa-fc61-496f-81ed-b89ee5a92cdf";
+
 function buildServer() {
   const server = new McpServer({
     name: "contract-aggregator",
@@ -39,6 +47,11 @@ server.registerTool(
     title: "Search Contracts",
     description:
       "Search Virginia government contract opportunities by agency, NAICS code, contract type, source, and sort order.",
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
     inputSchema: {
       agency: z.string().optional().describe("Agency name filter, e.g. 'DEPARTMENT OF TRANSPORTATION'"),
       naics: z
@@ -90,6 +103,11 @@ server.registerTool(
     title: "Get Contract Details",
     description:
       "Retrieve full details for a single contract posting by its numeric id. Requires a backend route (GET /api/opportunities/<id>) that does not exist yet in the current repo.",
+    annotations: {
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
     inputSchema: {
       posting_id: z.number().int().describe("The postings.id value from search_contracts results"),
     },
@@ -126,9 +144,21 @@ server.registerTool(
   "mark_feedback",
   {
     title: "Mark Contract Feedback",
-    description: "Record like/dislike feedback for a client on a specific contract posting.",
+    description:
+      "Record like/dislike feedback on a specific contract posting for the configured client. client_id is optional and defaults to the single configured client, so it does not need to be asked from the user.",
+    annotations: {
+      readOnlyHint: false,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
     inputSchema: {
-      client_id: z.string().uuid().describe("UUID of the client recording feedback"),
+      client_id: z
+        .string()
+        .uuid()
+        .optional()
+        .describe(
+          "UUID of the client recording feedback. Defaults to the single configured client if omitted."
+        ),
       posting_id: z.number().int().describe("The postings.id value"),
       action: z.enum(["like", "dislike"]),
       rating: z.number().int().min(1).max(5).optional(),
@@ -136,11 +166,12 @@ server.registerTool(
     },
   },
   async ({ client_id, posting_id, action, rating, notes }) => {
+    const resolvedClientId = client_id || DEFAULT_CLIENT_ID;
     const res = await fetch(`${BACKEND_URL}/api/feedback`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        client_id,
+        client_id: resolvedClientId,
         posting_id,
         action,
         rating,

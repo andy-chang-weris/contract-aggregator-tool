@@ -33,6 +33,12 @@ const PORT = process.env.PORT || 3000;
 const DEFAULT_CLIENT_ID =
   process.env.DEFAULT_CLIENT_ID || "9f68f2aa-fc61-496f-81ed-b89ee5a92cdf";
 
+// New: shared secret sent on write requests to proxy.py's protected /api/*
+// write routes. Must match API_SHARED_SECRET set on the Flask Railway
+// service. Read-only requests (search_contracts, get_contract_details) do
+// not send this, since GET routes are intentionally left unprotected.
+const API_SHARED_SECRET = process.env.API_SHARED_SECRET || "";
+
 function buildServer() {
   const server = new McpServer({
     name: "contract-aggregator",
@@ -189,7 +195,7 @@ server.registerTool(
   async ({ posting_id, ai_summary }) => {
     const res = await fetch(`${BACKEND_URL}/api/opportunities/${posting_id}/summary`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-API-Key": API_SHARED_SECRET },
       body: JSON.stringify({ ai_summary }),
     });
     const data = await res.json().catch(() => ({}));
@@ -247,7 +253,7 @@ server.registerTool(
     const resolvedClientId = client_id || DEFAULT_CLIENT_ID;
     const res = await fetch(`${BACKEND_URL}/api/feedback`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-API-Key": API_SHARED_SECRET },
       body: JSON.stringify({
         client_id: resolvedClientId,
         posting_id,

@@ -27,6 +27,26 @@ except ImportError:
 app = Flask(__name__)
 CORS(app)
 
+API_SHARED_SECRET = os.getenv("API_SHARED_SECRET")
+WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+@app.before_request
+def require_api_key_for_writes():
+    if request.method not in WRITE_METHODS:
+        return None
+    if not request.path.startswith("/api/"):
+        return None
+    if not API_SHARED_SECRET:
+        # Fails open with a warning if the env var isn't set, so you don't
+        # accidentally lock yourself out before configuring it. Flip this
+        # to fail closed once you've confirmed the key is set on Railway.
+        print("  [security] WARNING: API_SHARED_SECRET not set; write routes are unprotected.")
+        return None
+    provided = request.headers.get("X-API-Key")
+    if provided != API_SHARED_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+    return None
+
 CACHE_TTL_SECONDS = 3600
 _cache = {}
 

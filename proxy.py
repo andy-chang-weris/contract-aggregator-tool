@@ -168,7 +168,7 @@ def opportunities():
     naics_list    = [n.strip() for n in naics_raw.split(",") if n.strip()]
     contract_type = (request.args.get("contractType") or "").strip()
     source        = (request.args.get("source")       or "").strip()
-    #split         = (request.args.get("split")        or "").strip()
+    split         = (request.args.get("split")        or "").strip()
 
     sort_by  = (request.args.get("sortBy")  or "").strip()
     sort_dir = (request.args.get("sortDir") or "desc").strip().lower()
@@ -185,7 +185,7 @@ def opportunities():
         "agency": agency, "naics": naics_raw,
         "contractType": contract_type, "source": source,
         "sortBy": sort_by, "sortDir": sort_dir,
-        #"split": split,
+        "split": split,
     }, sort_keys=True)
 
     cached = cache_get(cache_key)
@@ -208,9 +208,9 @@ def opportunities():
     if source:
         conditions.append("source_site = %s")
         params.append(source)
-    #if split:
-    #    conditions.append("dataset_split = %s")
-    #    params.append(split)
+    if split:
+        conditions.append("dataset_split = %s")
+        params.append(split)
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 

@@ -28,7 +28,7 @@ LOCAL_JSON_FILE = "sam_opportunities.json"
 # combined agency/organization text, case-insensitive substring match).
 # Mirrors the agency filter exposed in the UI.
 AGENCY_KEYWORDS = {
-    "DOT":   ["DEPARTMENT OF TRANSPORTATION"],
+    "DOT":   ["DEPARTMENT OF TRANSPORTATION", "TRANSPORTATION, DEPARTMENT OF"],
     "DHS":   ["DEPARTMENT OF HOMELAND SECURITY", "HOMELAND SECURITY"],
     "FHWA":  ["FEDERAL HIGHWAY"],
     "FRA":   ["FEDERAL RAILROAD"],

@@ -159,7 +159,7 @@ server.registerTool(
             type: "text",
             text: `Could not fetch contract ${posting_id} (${res.status}): ${JSON.stringify(
               data
-            )}. Note: this endpoint may not exist yet on the backend.`,
+            )}`,
           },
         ],
         isError: true,
@@ -212,7 +212,7 @@ server.registerTool(
             type: "text",
             text: `Could not save summary for contract ${posting_id} (${res.status}): ${JSON.stringify(
               data
-            )}. Note: this endpoint may not exist yet on the backend.`,
+            )}`,
           },
         ],
         isError: true,

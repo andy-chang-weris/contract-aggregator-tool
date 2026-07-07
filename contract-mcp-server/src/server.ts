@@ -17,16 +17,19 @@
  * tool as unverified until the backend route is added and tested.
  */
 
+import express from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:5000";
+const PORT = process.env.PORT || 3000;
 
-const server = new McpServer({
-  name: "contract-aggregator",
-  version: "0.1.0",
-});
+function buildServer() {
+  const server = new McpServer({
+    name: "contract-aggregator",
+    version: "0.1.0",
+  });
 
 // ── search_contracts ────────────────────────────────────────────────────
 // Verified against GET /api/opportunities in proxy.py.
@@ -160,18 +163,68 @@ server.registerTool(
   }
 );
 
+  return server;
+}
+
 // Outlook sending is intentionally not implemented as an MCP tool. Per the
 // architecture decision above, the ChatGPT agent calls search_contracts and
 // get_contract_details, summarizes results, then uses its own Outlook
 // connector to draft/send.
 
-async function main() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error("Contract Aggregator MCP server running on stdio");
-}
+const app = express();
+app.use(express.json());
 
-main().catch((err) => {
-  console.error("Fatal error starting MCP server:", err);
-  process.exit(1);
+// Stateless mode: a new McpServer + transport per request, per the pattern
+// shown in the MCP TypeScript SDK's StreamableHTTPServerTransport docs
+// (sessionIdGenerator: undefined = stateless). I could not find this exact
+// snippet in project knowledge since your repo has no MCP code; this is
+// standard SDK usage, not repo-sourced.
+app.post("/mcp", async (req, res) => {
+  try {
+    const server = buildServer();
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+    });
+    res.on("close", () => {
+      transport.close();
+      server.close();
+    });
+    await server.connect(transport);
+    await transport.handleRequest(req, res, req.body);
+  } catch (err) {
+    console.error("MCP request error:", err);
+    if (!res.headersSent) {
+      res.status(500).json({
+        jsonrpc: "2.0",
+        error: { code: -32603, message: "Internal server error" },
+        id: null,
+      });
+    }
+  }
+});
+
+// GET/DELETE are not used in stateless mode; return 405 per the SDK's own
+// stateless example rather than leaving them unhandled.
+app.get("/mcp", (_req, res) => {
+  res.status(405).json({
+    jsonrpc: "2.0",
+    error: { code: -32000, message: "Method not allowed. This server runs in stateless mode." },
+    id: null,
+  });
+});
+app.delete("/mcp", (_req, res) => {
+  res.status(405).json({
+    jsonrpc: "2.0",
+    error: { code: -32000, message: "Method not allowed. This server runs in stateless mode." },
+    id: null,
+  });
+});
+
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
+
+app.listen(PORT, () => {
+  console.log(`Contract Aggregator MCP server listening on port ${PORT}`);
+  console.log(`MCP endpoint: http://localhost:${PORT}/mcp`);
 });

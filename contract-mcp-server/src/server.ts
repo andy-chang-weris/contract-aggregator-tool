@@ -46,7 +46,7 @@ server.registerTool(
   {
     title: "Search Contracts",
     description:
-      "Search Virginia government contract opportunities by agency, NAICS code, contract type, source, and sort order.",
+      "Search Virginia government contract opportunities by agency, NAICS code, contract type, and source. Supports sorting by posted_date (chronological) or relevance (best match to the client's saved preferences, for building digests/recommendations).",
     annotations: {
       readOnlyHint: true,
       openWorldHint: false,
@@ -60,24 +60,49 @@ server.registerTool(
         .describe("One or more NAICS codes, e.g. ['541511', '541512']"),
       contractType: z.string().optional().describe("Substring match against award_status"),
       source: z.string().optional().describe("Exact source_site value"),
-      sortBy: z.enum(["posted_date"]).optional(),
-      sortDir: z.enum(["asc", "desc"]).optional(),
+      sortBy: z
+        .enum(["posted_date", "relevance"])
+        .optional()
+        .describe(
+          "'relevance' ranks by best match to the configured client's saved preferences (uses a different backend endpoint). 'posted_date' sorts chronologically. Use 'relevance' when building a digest of top matches."
+        ),
+      sortDir: z.enum(["asc", "desc"]).optional().describe("Only applies to sortBy: 'posted_date'."),
+      excludeNegativeFeedback: z
+        .boolean()
+        .optional()
+        .describe("Only applies to sortBy: 'relevance'. Excludes postings the client has disliked."),
       limit: z.number().int().min(1).max(1000).optional().default(20),
       offset: z.number().int().min(0).optional().default(0),
     },
   },
-  async ({ agency, naics, contractType, source, sortBy, sortDir, limit, offset }) => {
+  async ({ agency, naics, contractType, source, sortBy, sortDir, excludeNegativeFeedback, limit, offset }) => {
     const params = new URLSearchParams();
     if (agency) params.set("agency", agency);
     if (naics && naics.length > 0) params.set("naics", naics.join(","));
     if (contractType) params.set("contractType", contractType);
     if (source) params.set("source", source);
-    if (sortBy) params.set("sortBy", sortBy);
-    if (sortDir) params.set("sortDir", sortDir);
     params.set("limit", String(limit));
     params.set("offset", String(offset));
 
-    const res = await fetch(`${BACKEND_URL}/api/opportunities?${params.toString()}`);
+    // Verified against proxy.py: GET /api/opportunities only supports
+    // sortBy=posted_date (ALLOWED_SORT_FIELDS = {"posted_date"}). Best-match
+    // ranking lives on a separate route, GET /api/clients/<id>/ranked-opportunities,
+    // confirmed in proxy.py's ranked_opportunities() function. There is no
+    // single endpoint that supports both, so this tool switches endpoints
+    // based on sortBy rather than passing sortBy=relevance to /api/opportunities,
+    // which would silently be ignored by the backend (sort_by falls back to
+    // None if not in ALLOWED_SORT_FIELDS).
+    let url: string;
+    if (sortBy === "relevance") {
+      url = `${BACKEND_URL}/api/clients/${DEFAULT_CLIENT_ID}/ranked-opportunities`;
+      params.set("excludeNegativeFeedback", String(excludeNegativeFeedback ?? true));
+    } else {
+      if (sortBy) params.set("sortBy", sortBy);
+      if (sortDir) params.set("sortDir", sortDir);
+      url = `${BACKEND_URL}/api/opportunities`;
+    }
+
+    const res = await fetch(`${url}?${params.toString()}`);
     const data = await res.json();
 
     if (!res.ok) {

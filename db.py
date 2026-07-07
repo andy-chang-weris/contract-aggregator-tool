@@ -105,6 +105,7 @@ def setup_database():
         "source_listing_id":    "TEXT",
         "date_scraped":         "TEXT",
         "raw_response":         "TEXT",
+        "ai_summary":           "TEXT",
     }
 
     # Fetch existing columns from PostgreSQL information schema

@@ -808,6 +808,42 @@ def opportunity_detail(posting_id):
         return jsonify({"error": "not found"}), 404
     return jsonify(dict(row))
 
+@app.route("/api/opportunities/<int:posting_id>/summary", methods=["PATCH"])
+def update_contract_summary(posting_id):
+    data = request.get_json(silent=True) or {}
+    ai_summary = (data.get("ai_summary") or "").strip()
+
+    if not ai_summary:
+        return jsonify({"error": "ai_summary is required"}), 400
+
+    try:
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        cursor.execute("SELECT id FROM postings WHERE id = %s", (posting_id,))
+        if not cursor.fetchone():
+            cursor.close(); conn.close()
+            return jsonify({"error": "posting_id does not exist"}), 404
+
+        cursor.execute("""
+            UPDATE postings
+            SET ai_summary = %s
+            WHERE id = %s
+            RETURNING id, title, ai_summary
+        """, (ai_summary, posting_id))
+        row = cursor.fetchone()
+        conn.commit()
+        cursor.close(); conn.close()
+
+        return jsonify({"status": "ok", "posting": dict(row)})
+
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     print(f"\n  GovContracts proxy  → http://localhost:{port}")

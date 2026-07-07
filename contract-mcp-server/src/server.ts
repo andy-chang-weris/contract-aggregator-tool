@@ -161,6 +161,59 @@ server.registerTool(
   }
 );
 
+// ── save_contract_summary ───────────────────────────────────────────────
+// NOT VERIFIED: PATCH /api/opportunities/<id>/summary does not exist yet in
+// proxy.py as of this project knowledge search. This tool calls that URL,
+// but the route must be added to proxy.py (and the ai_summary column added
+// via db.py's columns_to_ensure) before this will work. It will 404 until
+// then.
+server.registerTool(
+  "save_contract_summary",
+  {
+    title: "Save Contract Summary",
+    description:
+      "Save an AI-generated plain-language summary for a contract posting, to be displayed in place of the raw description in the web UI. Write the summary yourself based on the posting's title, description, and any other details you have, then call this tool to persist it. Requires a backend route (PATCH /api/opportunities/<id>/summary) that does not exist yet in the current repo.",
+    annotations: {
+      readOnlyHint: false,
+      openWorldHint: false,
+      destructiveHint: false,
+    },
+    inputSchema: {
+      posting_id: z.number().int().describe("The postings.id value"),
+      ai_summary: z
+        .string()
+        .min(1)
+        .describe("The plain-language AI-written summary of this contract, to replace the raw description"),
+    },
+  },
+  async ({ posting_id, ai_summary }) => {
+    const res = await fetch(`${BACKEND_URL}/api/opportunities/${posting_id}/summary`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ai_summary }),
+    });
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Could not save summary for contract ${posting_id} (${res.status}): ${JSON.stringify(
+              data
+            )}. Note: this endpoint may not exist yet on the backend.`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    return {
+      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    };
+  }
+);
+
 // ── mark_feedback ────────────────────────────────────────────────────────
 // Verified against POST /api/feedback in proxy.py. action is restricted to
 // 'like' or 'dislike' (VALID_FEEDBACK_ACTIONS in proxy.py); rating 1-5 is

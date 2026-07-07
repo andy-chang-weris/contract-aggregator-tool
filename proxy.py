@@ -334,6 +334,14 @@ def add_feedback():
                 metadata
             )
             VALUES (%s, %s, %s::jsonb, %s, %s, %s, %s, %s::jsonb)
+            ON CONFLICT (client_id, posting_id) DO UPDATE SET
+                action = EXCLUDED.action,
+                rating = EXCLUDED.rating,
+                notes = EXCLUDED.notes,
+                feedback_source = EXCLUDED.feedback_source,
+                metadata = EXCLUDED.metadata,
+                posting_snapshot = EXCLUDED.posting_snapshot,
+                created_at = now()
             RETURNING id, client_id, posting_id, action, rating, created_at
         """, (
             client_id,
@@ -364,7 +372,61 @@ def add_feedback():
         except Exception:
             pass
         return jsonify({"error": f"Database error: {str(e)}"}), 500
-    
+
+
+@app.route("/api/clients/<client_id>/feedback", methods=["GET"])
+def get_client_feedback(client_id):
+    """Returns this client's existing feedback actions, keyed by posting_id.
+    NEW ROUTE — did not exist in proxy.py prior to this change. Added so the
+    frontend can disable Like/Dislike buttons for postings already rated."""
+    try:
+        client_id = parse_uuid(client_id, "client_id")
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    posting_ids_param = request.args.get("posting_ids", "")
+    posting_ids = [p for p in posting_ids_param.split(",") if p.strip()]
+
+    try:
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        if posting_ids:
+            try:
+                posting_ids_int = [int(p) for p in posting_ids]
+            except ValueError:
+                cursor.close()
+                conn.close()
+                return jsonify({"error": "posting_ids must be a comma-separated list of integers"}), 400
+
+            cursor.execute(
+                """
+                SELECT posting_id, action
+                FROM client_feedback
+                WHERE client_id = %s AND posting_id = ANY(%s)
+                """,
+                (client_id, posting_ids_int)
+            )
+        else:
+            cursor.execute(
+                "SELECT posting_id, action FROM client_feedback WHERE client_id = %s",
+                (client_id,)
+            )
+
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+    except Exception as e:
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
+
+    feedback_map = {
+        row["posting_id"]: row["action"]
+        for row in rows if row["posting_id"] is not None
+    }
+    return jsonify({"client_id": str(client_id), "feedback": feedback_map})
+
+
 @app.route("/api/clients", methods=["POST"])
 def create_client():
     data = request.get_json(silent=True) or {}

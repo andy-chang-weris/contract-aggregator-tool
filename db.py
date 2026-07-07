@@ -238,6 +238,28 @@ def setup_ml_tables():
         END $$;
     """)
 
+    # One feedback row per (client, posting) — required so POST /api/feedback
+    # in proxy.py can upsert on repeat like/dislike instead of inserting a
+    # new duplicate row every time the button is clicked. If duplicate
+    # (client_id, posting_id) rows already exist, this ADD CONSTRAINT will
+    # fail; deduplicate them first (keep the latest by created_at) before
+    # re-running this migration.
+    cursor.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1
+                FROM pg_constraint
+                WHERE conrelid = 'client_feedback'::regclass
+                AND conname = 'uq_client_feedback_client_posting'
+            ) THEN
+                ALTER TABLE client_feedback
+                ADD CONSTRAINT uq_client_feedback_client_posting
+                UNIQUE (client_id, posting_id);
+            END IF;
+        END $$;
+    """)
+
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_client_feedback_client_time
         ON client_feedback(client_id, created_at DESC)

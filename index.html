@@ -197,6 +197,8 @@
   const PAGE_SIZE    = 20;
   const AUTO_TRAIN_AFTER_FEEDBACK = true;
 
+  let feedbackState = {}; // { postingId: 'like' | 'dislike' } — this client's existing feedback
+
   const DEFAULT_CLIENT_ID = '9f68f2aa-fc61-496f-81ed-b89ee5a92cdf';
 
   const CLIENT_ID =
@@ -471,6 +473,30 @@
     });
   }
 
+  /* ── Feedback state (persisted server-side, fetched on load) ─ */
+  // NEW: calls GET /api/clients/<client_id>/feedback, a route added to
+  // proxy.py alongside this change. Populates feedbackState so renderCard
+  // can disable Like/Dislike buttons for postings already rated by this
+  // client, instead of only disabling them for 1200ms after each click.
+  async function loadFeedbackState() {
+    const base = document.getElementById('proxy-url').value.trim();
+    if (!CLIENT_ID) return;
+
+    try {
+      const res = await fetch(`${base}/api/clients/${CLIENT_ID}/feedback`, {
+        signal: AbortSignal.timeout(10000)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        feedbackState = data.feedback || {};
+      } else {
+        console.warn('Could not load feedback state:', data.error || res.status);
+      }
+    } catch (err) {
+      console.warn('Could not load feedback state:', err);
+    }
+  }
+
   async function sendFeedback(postingId, action, button = null, extra = {}) {
     const base = document.getElementById('proxy-url').value.trim();
 
@@ -511,6 +537,7 @@
       }
 
       trainPreferencesInBackground();
+      feedbackState[Number(postingId)] = action;
 
       if (button) {
         button.innerHTML = 'Saved';
@@ -545,6 +572,14 @@
     const place   = c.place_of_performance || 'Virginia';
     const posted  = c.posted_date || c.postedDate;
     const status  = c.award_status || c.typeLabel || c.type || '—';
+
+    // NEW: check whether this client already rated this posting, and
+    // disable both feedback buttons if so, since client_feedback now
+    // enforces one row per (client_id, posting_id).
+    const existingAction  = feedbackState[Number(c.id)];
+    const feedbackDisabled = existingAction ? 'disabled' : '';
+    const likeLabel    = existingAction === 'like'    ? 'Liked'    : 'Like';
+    const dislikeLabel = existingAction === 'dislike' ? 'Disliked' : 'Dislike';
 
     return `
       <div class="card">
@@ -590,13 +625,15 @@
         ${renderDescription(c)}
         <div class="feedback-row">
           <button class="feedback-btn positive"
+                  ${feedbackDisabled}
                   onclick="sendFeedback(${Number(c.id) || 0}, 'like', this)">
-            <i class="ti ti-thumb-up" aria-hidden="true"></i> Like
+            <i class="ti ti-thumb-up" aria-hidden="true"></i> ${likeLabel}
           </button>
         
           <button class="feedback-btn negative"
+                  ${feedbackDisabled}
                   onclick="sendFeedback(${Number(c.id) || 0}, 'dislike', this)">
-            <i class="ti ti-thumb-down" aria-hidden="true"></i> Dislike
+            <i class="ti ti-thumb-down" aria-hidden="true"></i> ${dislikeLabel}
           </button>
         </div>
       </div>`;
@@ -637,6 +674,10 @@
     }
 
     try {
+      // NEW: refresh feedbackState before rendering so buttons reflect
+      // the latest saved likes/dislikes for this client.
+      await loadFeedbackState();
+
       const res = await fetch(`${endpoint}?${params}`, {
         signal: AbortSignal.timeout(30000)
       });

@@ -6,10 +6,13 @@ Virginia contracts only — state filter removed.
 import os
 import json
 import time
+import logging
 import psycopg2
 import psycopg2.extras
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from uuid import UUID
 from preference_training import train_client_preferences
 from relevance_ranking import rank_postings
@@ -26,6 +29,16 @@ except ImportError:
 
 app = Flask(__name__)
 CORS(app)
+
+logging.basicConfig(level=logging.ERROR)
+logger = logging.getLogger(__name__)
+
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per hour", "50 per minute"],
+    storage_uri="memory://",
+)
 
 API_SHARED_SECRET = os.getenv("API_SHARED_SECRET")
 WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
@@ -264,7 +277,8 @@ def opportunities():
         conn.close()
 
     except Exception as e:
-        return jsonify({"error": f"Database error: {str(e)}"}), 500
+        logger.error("Database error in %s: %s", request.path, e)
+        return jsonify({"error": "Internal server error"}), 500
 
     result = {
         "total": total, "limit": limit, "offset": offset,
@@ -275,6 +289,7 @@ def opportunities():
     return jsonify(result)
 
 @app.route("/api/feedback", methods=["POST"])
+@limiter.limit("20 per minute")
 def add_feedback():
     data = request.get_json(silent=True) or {}
 
@@ -387,11 +402,12 @@ def add_feedback():
         })
 
     except Exception as e:
+        logger.error("Database error in %s: %s", request.path, e)
         try:
             conn.rollback()
         except Exception:
             pass
-        return jsonify({"error": f"Database error: {str(e)}"}), 500
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @app.route("/api/clients/<client_id>/feedback", methods=["GET"])
@@ -438,7 +454,8 @@ def get_client_feedback(client_id):
         conn.close()
 
     except Exception as e:
-        return jsonify({"error": f"Database error: {str(e)}"}), 500
+        logger.error("Database error in %s: %s", request.path, e)
+        return jsonify({"error": "Internal server error"}), 500
 
     feedback_map = {
         row["posting_id"]: row["action"]
@@ -448,6 +465,7 @@ def get_client_feedback(client_id):
 
 
 @app.route("/api/clients", methods=["POST"])
+@limiter.limit("20 per minute")
 def create_client():
     data = request.get_json(silent=True) or {}
 
@@ -486,13 +504,15 @@ def create_client():
         })
 
     except Exception as e:
+        logger.error("Database error in %s: %s", request.path, e)
         try:
             conn.rollback()
         except Exception:
             pass
-        return jsonify({"error": f"Database error: {str(e)}"}), 500
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route("/api/clients/<client_id>/preferences", methods=["GET", "PUT"])
+@limiter.limit("20 per minute", methods=["PUT"])
 def client_preferences(client_id):
     try:
         client_id = parse_uuid(client_id, "client_id")
@@ -590,14 +610,16 @@ def client_preferences(client_id):
         })
 
     except Exception as e:
+        logger.error("Database error in %s: %s", request.path, e)
         try:
             conn.rollback()
         except Exception:
             pass
-        return jsonify({"error": f"Database error: {str(e)}"}), 500
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @app.route("/api/clients/<client_id>/train-preferences", methods=["POST"])
+@limiter.limit("20 per minute")
 def train_preferences_endpoint(client_id):
     try:
         client_id = parse_uuid(client_id, "client_id")
@@ -644,7 +666,8 @@ def train_preferences_endpoint(client_id):
         return jsonify(result), status_code
 
     except Exception as e:
-        return jsonify({"error": f"Training error: {str(e)}"}), 500
+        logger.error("Training error in %s: %s", request.path, e)
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route("/api/clients/<client_id>/ranked-opportunities")
 def ranked_opportunities(client_id):
@@ -714,7 +737,8 @@ def ranked_opportunities(client_id):
         cursor.close(); conn.close()
 
     except Exception as e:
-        return jsonify({"error": f"Database error: {str(e)}"}), 500
+        logger.error("Database error in %s: %s", request.path, e)
+        return jsonify({"error": "Internal server error"}), 500
 
     if excluded_ids:
         candidates = [c for c in candidates if c.get("id") not in excluded_ids]
@@ -734,6 +758,7 @@ def ranked_opportunities(client_id):
     })
 
 @app.route("/api/clients/<client_id>/train-ml-model", methods=["POST"])
+@limiter.limit("20 per minute")
 def train_ml_model_endpoint(client_id):
     try:
         client_id = parse_uuid(client_id, "client_id")
@@ -787,7 +812,8 @@ def train_ml_model_endpoint(client_id):
         return jsonify(result), status_code
  
     except Exception as e:
-        return jsonify({"error": f"ML training error: {str(e)}"}), 500
+        logger.error("ML training error in %s: %s", request.path, e)
+        return jsonify({"error": "Internal server error"}), 500
  
  
 @app.route("/api/clients/<client_id>/ml-model-status")
@@ -815,20 +841,27 @@ def ml_model_status_endpoint(client_id):
             "train_accuracy": bundle.get("train_accuracy"),
         })
     except Exception as e:
-        return jsonify({"error": f"Could not read model file: {str(e)}"}), 500
+        logger.error("Model read error in %s: %s", request.path, e)
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route("/api/opportunities/<int:posting_id>")
 def opportunity_detail(posting_id):
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    cursor.execute("SELECT * FROM postings WHERE id = %s", (posting_id,))
-    row = cursor.fetchone()
-    cursor.close(); conn.close()
+    try:
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor.execute("SELECT * FROM postings WHERE id = %s", (posting_id,))
+        row = cursor.fetchone()
+        cursor.close(); conn.close()
+    except Exception as e:
+        logger.error("Database error in %s: %s", request.path, e)
+        return jsonify({"error": "Internal server error"}), 500
+
     if not row:
         return jsonify({"error": "not found"}), 404
     return jsonify(dict(row))
 
 @app.route("/api/opportunities/<int:posting_id>/summary", methods=["PATCH"])
+@limiter.limit("20 per minute")
 def update_contract_summary(posting_id):
     data = request.get_json(silent=True) or {}
     ai_summary = (data.get("ai_summary") or "").strip()
@@ -858,11 +891,12 @@ def update_contract_summary(posting_id):
         return jsonify({"status": "ok", "posting": dict(row)})
 
     except Exception as e:
+        logger.error("Database error in %s: %s", request.path, e)
         try:
             conn.rollback()
         except Exception:
             pass
-        return jsonify({"error": f"Database error: {str(e)}"}), 500
+        return jsonify({"error": "Internal server error"}), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

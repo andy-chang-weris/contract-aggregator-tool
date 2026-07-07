@@ -610,7 +610,7 @@ def ranked_opportunities(client_id):
                 FROM client_feedback
                 WHERE client_id = %s
                   AND posting_id IS NOT NULL
-                  AND action IN ('not_interested', 'dismissed')
+                  AND action = 'dislike'
             """, (client_id,))
             excluded_ids = {r["posting_id"] for r in cursor.fetchall()}
 

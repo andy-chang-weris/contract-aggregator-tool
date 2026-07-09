@@ -1,7 +1,10 @@
+import os
 import json
 import boto3
 
-client = boto3.client("secretsmanager")
+client = boto3.client("secretsmanager", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+
+#client = boto3.client("secretsmanager")
 
 def get_db_config(secret_name):
 

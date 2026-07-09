@@ -1,7 +1,9 @@
 flask
 flask-cors
+flask-limiter
 psycopg2-binary
 requests
 python-dotenv
 gunicorn
 boto3
+scikit-learn==1.9.0

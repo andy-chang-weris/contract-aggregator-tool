@@ -914,3 +914,36 @@ a.chip.active:hover {
 .desc-toggle:hover {
   color: var(--navy);
 }
+
+/* ── AI summary ───────────────────────────────────────────── */
+.card-ai-summary {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+
+.ai-summary-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--teal-dark);
+  margin: 0 0 4px;
+}
+
+.ai-summary-label i {
+  font-size: 12px;
+}
+
+.ai-summary-text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text2);
+  white-space: normal;
+  word-break: break-word;
+  margin: 0;
+}

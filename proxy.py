@@ -6,15 +6,25 @@ Virginia contracts only — state filter removed.
 import os
 import json
 import time
+
 import sys
 from pathlib import Path
+
+import logging
+
 import psycopg2
 import psycopg2.extras
 from flask import Flask, abort, jsonify, request, send_from_directory
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from uuid import UUID
 from preference_training import train_client_preferences
 from relevance_ranking import rank_postings
+from ml_training import train_client_model
+from pathlib import Path
+
+MODEL_DIR = Path(os.getenv("ML_MODEL_DIR", "./models"))
 
 from aws_secrets import get_db_config
 
@@ -32,28 +42,81 @@ if str(AGENT_DIR) not in sys.path:
 app = Flask(__name__)
 CORS(app)
 
+logging.basicConfig(level=logging.ERROR)
+logger = logging.getLogger(__name__)
+
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per hour", "50 per minute"],
+    storage_uri="memory://",
+)
+
+API_SHARED_SECRET = os.getenv("API_SHARED_SECRET")
+WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+@app.before_request
+def require_api_key_for_writes():
+    if request.method not in WRITE_METHODS:
+        return None
+    if not request.path.startswith("/api/"):
+        return None
+    if not API_SHARED_SECRET:
+        # Fails open with a warning if the env var isn't set, so you don't
+        # accidentally lock yourself out before configuring it. Flip this
+        # to fail closed once you've confirmed the key is set on Railway.
+        print("  [security] WARNING: API_SHARED_SECRET not set; write routes are unprotected.")
+        return None
+    provided = request.headers.get("X-API-Key")
+    if provided != API_SHARED_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+    return None
+
 CACHE_TTL_SECONDS = 3600
 _cache = {}
 
 VALID_FEEDBACK_ACTIONS = {
-    "viewed",
-    "clicked",
-    "saved",
-    "not_interested",
-    "highly_relevant",
-    "applied",
-    "dismissed",
+    "like", 
+    "dislike"
 }
 
 ACTION_WEIGHTS = {
-    "viewed": 0.1,
-    "clicked": 0.5,
-    "saved": 1.0,
-    "highly_relevant": 2.0,
-    "applied": 3.0,
-    "not_interested": -1.5,
-    "dismissed": -1.0,
+    "like": 1.0,
+    "dislike": -1.0,
 }
+
+# ── Agency filter word-order variants ──────────────────────────────────────
+# Different sources format the same agency name differently:
+#   SAM.gov inverts it:            "TRANSPORTATION, DEPARTMENT OF"
+#   Acquisition Gateway uses:      "Department of Transportation"
+#   eVA (Virginia) uses, for VDOT: "Virginia Department of Transportation"
+# A single ILIKE substring match on the UI's dropdown value cannot match
+# both word orders at once, so each filterable agency value is mapped to
+# every known variant, and the query becomes an OR across all of them.
+# NOTE: only the DOT entry below has been confirmed against user-reported
+# real values for all three sources. Other agencies in
+# sources/sam_gov.py's AGENCY_KEYWORDS (DHS, FHWA, FRA, FMCSA, FAA, CBP,
+# NHTSA, TSA, FEMA) have not been individually checked against
+# Acquisition Gateway / eVA formatting and may need the same treatment.
+AGENCY_FILTER_VARIANTS = {
+    "DEPARTMENT OF TRANSPORTATION": [
+        "DEPARTMENT OF TRANSPORTATION",   # Acquisition Gateway; also matches
+                                           # "...Department of Transportation"
+                                           # inside eVA's "Virginia Department
+                                           # of Transportation"
+        "TRANSPORTATION, DEPARTMENT OF",  # SAM.gov
+    ],
+}
+
+
+def build_agency_condition(agency: str, conditions: list, params: list) -> None:
+    """Append an agency WHERE clause that matches every known word-order
+    variant for the given filter value via OR, instead of a single
+    substring match that only fits one source's formatting."""
+    variants = AGENCY_FILTER_VARIANTS.get(agency.upper(), [agency])
+    clause = " OR ".join(["agency ILIKE %s"] * len(variants))
+    conditions.append(f"({clause})")
+    params.extend(f"%{v}%" for v in variants)
 
 
 def parse_uuid(value, field_name):
@@ -210,6 +273,11 @@ def opportunities():
     naics_list    = [n.strip() for n in naics_raw.split(",") if n.strip()]
     contract_type = (request.args.get("contractType") or "").strip()
     source        = (request.args.get("source")       or "").strip()
+    split         = (request.args.get("split")        or "").strip()
+    has_summary_raw = request.args.get("hasSummary")
+    has_summary = None
+    if has_summary_raw is not None:
+        has_summary = parse_bool(has_summary_raw, default=True)
 
     sort_by  = (request.args.get("sortBy")  or "").strip()
     sort_dir = (request.args.get("sortDir") or "desc").strip().lower()
@@ -226,6 +294,7 @@ def opportunities():
         "agency": agency, "naics": naics_raw,
         "contractType": contract_type, "source": source,
         "sortBy": sort_by, "sortDir": sort_dir,
+        "split": split, "hasSummary": has_summary,
     }, sort_keys=True)
 
     cached = cache_get(cache_key)
@@ -237,8 +306,7 @@ def opportunities():
     params     = []
 
     if agency:
-        conditions.append("agency ILIKE %s")
-        params.append(f"%{agency}%")
+        build_agency_condition(agency, conditions, params)
     if naics_list:
         placeholders = ",".join(["%s"] * len(naics_list))
         conditions.append(f"naics IN ({placeholders})")
@@ -249,6 +317,13 @@ def opportunities():
     if source:
         conditions.append("source_site = %s")
         params.append(source)
+    if split:
+        conditions.append("dataset_split = %s")
+        params.append(split)
+    if has_summary is True:
+        conditions.append("ai_summary IS NOT NULL AND ai_summary <> ''")
+    elif has_summary is False:
+        conditions.append("(ai_summary IS NULL OR ai_summary = '')")
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
@@ -269,7 +344,7 @@ def opportunities():
                 source_site, external_id, title, agency, organization,
                 naics, description, posted_date, deadline, award_date,
                 contract_value, award_status, contract_type, acq_strategy,
-                place_of_performance, url, date_scraped
+                place_of_performance, url, date_scraped, ai_summary
             FROM postings
             {where}
             {order}
@@ -282,7 +357,8 @@ def opportunities():
         conn.close()
 
     except Exception as e:
-        return jsonify({"error": f"Database error: {str(e)}"}), 500
+        logger.error("Database error in %s: %s", request.path, e)
+        return jsonify({"error": "Internal server error"}), 500
 
     result = {
         "total": total, "limit": limit, "offset": offset,
@@ -293,6 +369,7 @@ def opportunities():
     return jsonify(result)
 
 @app.route("/api/feedback", methods=["POST"])
+@limiter.limit("20 per minute")
 def add_feedback():
     data = request.get_json(silent=True) or {}
 
@@ -372,6 +449,14 @@ def add_feedback():
                 metadata
             )
             VALUES (%s, %s, %s::jsonb, %s, %s, %s, %s, %s::jsonb)
+            ON CONFLICT (client_id, posting_id) DO UPDATE SET
+                action = EXCLUDED.action,
+                rating = EXCLUDED.rating,
+                notes = EXCLUDED.notes,
+                feedback_source = EXCLUDED.feedback_source,
+                metadata = EXCLUDED.metadata,
+                posting_snapshot = EXCLUDED.posting_snapshot,
+                created_at = now()
             RETURNING id, client_id, posting_id, action, rating, created_at
         """, (
             client_id,
@@ -397,13 +482,70 @@ def add_feedback():
         })
 
     except Exception as e:
+        logger.error("Database error in %s: %s", request.path, e)
         try:
             conn.rollback()
         except Exception:
             pass
-        return jsonify({"error": f"Database error: {str(e)}"}), 500
-    
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@app.route("/api/clients/<client_id>/feedback", methods=["GET"])
+def get_client_feedback(client_id):
+    """Returns this client's existing feedback actions, keyed by posting_id.
+    NEW ROUTE — did not exist in proxy.py prior to this change. Added so the
+    frontend can disable Like/Dislike buttons for postings already rated."""
+    try:
+        client_id = parse_uuid(client_id, "client_id")
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    posting_ids_param = request.args.get("posting_ids", "")
+    posting_ids = [p for p in posting_ids_param.split(",") if p.strip()]
+
+    try:
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        if posting_ids:
+            try:
+                posting_ids_int = [int(p) for p in posting_ids]
+            except ValueError:
+                cursor.close()
+                conn.close()
+                return jsonify({"error": "posting_ids must be a comma-separated list of integers"}), 400
+
+            cursor.execute(
+                """
+                SELECT posting_id, action
+                FROM client_feedback
+                WHERE client_id = %s AND posting_id = ANY(%s)
+                """,
+                (client_id, posting_ids_int)
+            )
+        else:
+            cursor.execute(
+                "SELECT posting_id, action FROM client_feedback WHERE client_id = %s",
+                (client_id,)
+            )
+
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+    except Exception as e:
+        logger.error("Database error in %s: %s", request.path, e)
+        return jsonify({"error": "Internal server error"}), 500
+
+    feedback_map = {
+        row["posting_id"]: row["action"]
+        for row in rows if row["posting_id"] is not None
+    }
+    return jsonify({"client_id": str(client_id), "feedback": feedback_map})
+
+
 @app.route("/api/clients", methods=["POST"])
+@limiter.limit("20 per minute")
 def create_client():
     data = request.get_json(silent=True) or {}
 
@@ -442,13 +584,15 @@ def create_client():
         })
 
     except Exception as e:
+        logger.error("Database error in %s: %s", request.path, e)
         try:
             conn.rollback()
         except Exception:
             pass
-        return jsonify({"error": f"Database error: {str(e)}"}), 500
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route("/api/clients/<client_id>/preferences", methods=["GET", "PUT"])
+@limiter.limit("20 per minute", methods=["PUT"])
 def client_preferences(client_id):
     try:
         client_id = parse_uuid(client_id, "client_id")
@@ -546,14 +690,16 @@ def client_preferences(client_id):
         })
 
     except Exception as e:
+        logger.error("Database error in %s: %s", request.path, e)
         try:
             conn.rollback()
         except Exception:
             pass
-        return jsonify({"error": f"Database error: {str(e)}"}), 500
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @app.route("/api/clients/<client_id>/train-preferences", methods=["POST"])
+@limiter.limit("20 per minute")
 def train_preferences_endpoint(client_id):
     try:
         client_id = parse_uuid(client_id, "client_id")
@@ -600,7 +746,8 @@ def train_preferences_endpoint(client_id):
         return jsonify(result), status_code
 
     except Exception as e:
-        return jsonify({"error": f"Training error: {str(e)}"}), 500
+        logger.error("Training error in %s: %s", request.path, e)
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route("/api/clients/<client_id>/ranked-opportunities")
 def ranked_opportunities(client_id):
@@ -611,7 +758,6 @@ def ranked_opportunities(client_id):
 
     limit  = max(1, min(int(request.args.get("limit", 20)), 1000))
     offset = max(0, int(request.args.get("offset", 0)))
-    candidate_limit = max(1, min(int(request.args.get("candidateLimit", 1000)), 5000))
     exclude_negative = parse_bool(request.args.get("excludeNegativeFeedback"), default=False)
 
     agency        = (request.args.get("agency")       or "").strip()
@@ -622,7 +768,7 @@ def ranked_opportunities(client_id):
 
     conditions, params = [], []
     if agency:
-        conditions.append("agency ILIKE %s"); params.append(f"%{agency}%")
+        build_agency_condition(agency, conditions, params)
     if naics_list:
         placeholders = ",".join(["%s"] * len(naics_list))
         conditions.append(f"naics IN ({placeholders})"); params.extend(naics_list)
@@ -654,7 +800,7 @@ def ranked_opportunities(client_id):
                 FROM client_feedback
                 WHERE client_id = %s
                   AND posting_id IS NOT NULL
-                  AND action IN ('not_interested', 'dismissed')
+                  AND action = 'dislike'
             """, (client_id,))
             excluded_ids = {r["posting_id"] for r in cursor.fetchall()}
 
@@ -666,14 +812,13 @@ def ranked_opportunities(client_id):
                 place_of_performance, url, date_scraped
             FROM postings
             {where}
-            ORDER BY date_scraped DESC
-            LIMIT %s
-        """, params + [candidate_limit])
+        """, params)
         candidates = [dict(r) for r in cursor.fetchall()]
         cursor.close(); conn.close()
 
     except Exception as e:
-        return jsonify({"error": f"Database error: {str(e)}"}), 500
+        logger.error("Database error in %s: %s", request.path, e)
+        return jsonify({"error": "Internal server error"}), 500
 
     if excluded_ids:
         candidates = [c for c in candidates if c.get("id") not in excluded_ids]
@@ -692,6 +837,7 @@ def ranked_opportunities(client_id):
         "cached": False,
     })
 
+<<<<<<< HEAD
 
 @app.route("/")
 def index():
@@ -704,6 +850,217 @@ def static_files(path):
     if target.is_file():
         return send_from_directory(APP_DIR, path)
     abort(404)
+=======
+@app.route("/api/clients/<client_id>/train-ml-model", methods=["POST"])
+@limiter.limit("20 per minute")
+def train_ml_model_endpoint(client_id):
+    try:
+        client_id = parse_uuid(client_id, "client_id")
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+ 
+    data = request.get_json(silent=True) or {}
+ 
+    try:
+        min_feedback_events = parse_int(
+            data.get("min_feedback_events", 50),
+            "min_feedback_events"
+        )
+        include_clicks = parse_bool(data.get("include_clicks"), default=True)
+        min_category_count = parse_int(
+            data.get("min_category_count", 2),
+            "min_category_count"
+        )
+        max_keywords = parse_int(
+            data.get("max_keywords", 200),
+            "max_keywords"
+        )
+        min_keyword_count = parse_int(
+            data.get("min_keyword_count", 2),
+            "min_keyword_count"
+        )
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+ 
+    if min_feedback_events < 1:
+        return jsonify({"error": "min_feedback_events must be at least 1"}), 400
+    if min_category_count < 1:
+        return jsonify({"error": "min_category_count must be at least 1"}), 400
+    if max_keywords < 1 or max_keywords > 2000:
+        return jsonify({"error": "max_keywords must be between 1 and 2000"}), 400
+    if min_keyword_count < 1:
+        return jsonify({"error": "min_keyword_count must be at least 1"}), 400
+ 
+    try:
+        result = train_client_model(
+            get_db,
+            client_id,
+            min_feedback_events=min_feedback_events,
+            include_clicks=include_clicks,
+            model_dir=MODEL_DIR,
+            min_category_count=min_category_count,
+            max_keywords=max_keywords,
+            min_keyword_count=min_keyword_count,
+        )
+        status_code = 200 if result.get("status") not in ("error",) else 404
+        return jsonify(result), status_code
+ 
+    except Exception as e:
+        logger.error("ML training error in %s: %s", request.path, e)
+        return jsonify({"error": "Internal server error"}), 500
+ 
+ 
+@app.route("/api/clients/<client_id>/ml-model-status")
+def ml_model_status_endpoint(client_id):
+    """Lightweight check used by the frontend / scheduler to decide whether
+    a model exists yet and how old it is, without re-running training."""
+    try:
+        client_id = parse_uuid(client_id, "client_id")
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+ 
+    model_path = MODEL_DIR / f"{client_id}.pkl"
+    if not model_path.exists():
+        return jsonify({"client_id": client_id, "has_model": False})
+ 
+    try:
+        import pickle
+        with open(model_path, "rb") as fh:
+            bundle = pickle.load(fh)
+        return jsonify({
+            "client_id": client_id,
+            "has_model": True,
+            "trained_at": bundle.get("trained_at"),
+            "feedback_events": bundle.get("feedback_events"),
+            "train_accuracy": bundle.get("train_accuracy"),
+        })
+    except Exception as e:
+        logger.error("Model read error in %s: %s", request.path, e)
+        return jsonify({"error": "Internal server error"}), 500
+
+@app.route("/api/opportunities/<int:posting_id>")
+def opportunity_detail(posting_id):
+    try:
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor.execute("SELECT * FROM postings WHERE id = %s", (posting_id,))
+        row = cursor.fetchone()
+        cursor.close(); conn.close()
+    except Exception as e:
+        logger.error("Database error in %s: %s", request.path, e)
+        return jsonify({"error": "Internal server error"}), 500
+
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(dict(row))
+
+@app.route("/api/opportunities/<int:posting_id>/summary", methods=["PATCH"])
+@limiter.limit("20 per minute")
+def update_contract_summary(posting_id):
+    data = request.get_json(silent=True) or {}
+    ai_summary = (data.get("ai_summary") or "").strip()
+
+    if not ai_summary:
+        return jsonify({"error": "ai_summary is required"}), 400
+
+    try:
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        cursor.execute("SELECT id FROM postings WHERE id = %s", (posting_id,))
+        if not cursor.fetchone():
+            cursor.close(); conn.close()
+            return jsonify({"error": "posting_id does not exist"}), 404
+
+        cursor.execute("""
+            UPDATE postings
+            SET ai_summary = %s
+            WHERE id = %s
+            RETURNING id, title, ai_summary
+        """, (ai_summary, posting_id))
+        row = cursor.fetchone()
+        conn.commit()
+        cursor.close(); conn.close()
+
+        return jsonify({"status": "ok", "posting": dict(row)})
+
+    except Exception as e:
+        logger.error("Database error in %s: %s", request.path, e)
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@app.route("/api/opportunities/summaries", methods=["PATCH"])
+@limiter.limit("20 per minute")
+def update_contract_summaries_batch():
+    """Batch version of update_contract_summary, so ChatGPT can write many
+    AI summaries in one tool call/confirmation instead of one per contract.
+    NEW ROUTE — did not exist prior to this change."""
+    data = request.get_json(silent=True) or {}
+    items = data.get("summaries")
+
+    if not isinstance(items, list) or not items:
+        return jsonify({"error": "summaries must be a non-empty array"}), 400
+    if len(items) > 200:
+        return jsonify({"error": "summaries array too large (max 200 per call)"}), 400
+
+    parsed = []
+    for i, item in enumerate(items):
+        if not isinstance(item, dict):
+            return jsonify({"error": f"summaries[{i}] must be an object"}), 400
+        try:
+            posting_id = parse_int(item.get("posting_id"), f"summaries[{i}].posting_id")
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+        ai_summary = (item.get("ai_summary") or "").strip()
+        if not ai_summary:
+            return jsonify({"error": f"summaries[{i}].ai_summary is required"}), 400
+        parsed.append((posting_id, ai_summary))
+
+    updated = []
+    skipped = []
+
+    try:
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        for posting_id, ai_summary in parsed:
+            cursor.execute("SELECT id FROM postings WHERE id = %s", (posting_id,))
+            if not cursor.fetchone():
+                skipped.append({"posting_id": posting_id, "reason": "posting_id does not exist"})
+                continue
+
+            cursor.execute("""
+                UPDATE postings
+                SET ai_summary = %s
+                WHERE id = %s
+                RETURNING id, title, ai_summary
+            """, (ai_summary, posting_id))
+            updated.append(dict(cursor.fetchone()))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            "status": "ok",
+            "updated_count": len(updated),
+            "skipped_count": len(skipped),
+            "updated": updated,
+            "skipped": skipped,
+        })
+
+    except Exception as e:
+        logger.error("Database error in %s: %s", request.path, e)
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return jsonify({"error": "Internal server error"}), 500
+>>>>>>> f74cdc6bbff9b4f89b9e7a781885b41f8830030e
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

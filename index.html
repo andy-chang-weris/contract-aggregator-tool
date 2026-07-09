@@ -68,7 +68,7 @@
     <!-- Source filter -->
     <div class="field">
       <label for="f-source">Data source</label>
-      <select id="f-source" onchange="scopeContractTypes()">
+      <select id="f-source" onchange="scopeContractTypes(); scopeAgencies();">
         <option value="">All sources</option>
         <option value="SAM.gov">SAM.gov</option>
         <option value="Acquisition Gateway Forecast">Acquisition Gateway</option>
@@ -109,14 +109,36 @@
       <label for="f-org">Agency / organization</label>
       <select id="f-org">
         <option value="">All agencies</option>
-        <option value="FEDERAL HIGHWAY">FHWA — Federal Highway Admin.</option>
-        <option value="TRANSPORTATION SECURITY">TSA — Transportation Security</option>
-        <option value="FEDERAL TRANSIT">FTA — Federal Transit Admin.</option>
-        <option value="FEDERAL AVIATION">FAA — Federal Aviation Admin.</option>
-        <option value="DEPARTMENT OF TRANSPORTATION">DOT — Dept. of Transportation</option>
-        <option value="HOMELAND SECURITY">DHS — Dept. of Homeland Security</option>
-        <option value="ARMY CORPS">Army Corps of Engineers</option>
-        <option value="GENERAL SERVICES">GSA — General Services Admin.</option>
+
+        <optgroup label="Federal">
+          <option value="DEPARTMENT OF TRANSPORTATION">DOT — Dept. of Transportation</option>
+          <option value="HOMELAND SECURITY">DHS — Dept. of Homeland Security</option>
+          <option value="FEDERAL HIGHWAY">FHWA — Federal Highway Admin.</option>
+          <option value="FEDERAL RAILROAD">FRA — Federal Railroad Admin.</option>
+          <option value="FEDERAL MOTOR CARRIER SAFETY">FMCSA — Federal Motor Carrier Safety Admin.</option>
+          <option value="FEDERAL AVIATION">FAA — Federal Aviation Admin.</option>
+          <option value="CUSTOMS AND BORDER PROTECTION">CBP — Customs and Border Protection</option>
+          <option value="NATIONAL HIGHWAY TRAFFIC SAFETY">NHTSA — Natl. Highway Traffic Safety Admin.</option>
+          <option value="TRANSPORTATION SECURITY">TSA — Transportation Security Admin.</option>
+          <option value="FEDERAL EMERGENCY MANAGEMENT">FEMA — Federal Emergency Management Agency</option>
+        </optgroup>
+
+        <optgroup label="State">
+          <option value="VIRGINIA DEPARTMENT OF TRANSPORTATION">VDOT - Virginia Dept. of Transportation</option>
+          <option value="FAIRFAX">Fairfax County</option>
+          <option value="ARLINGTON">Arlington County</option>
+          <option value="LOUDOUN">Loudoun County</option>
+          <option value="PRINCE WILLIAM">Prince William County</option>
+          <option value="ALEXANDRIA">City of Alexandria</option>
+          <option value="FALLS CHURCH">City of Falls Church</option>
+          <option value="MANASSAS">City of Manassas / Manassas Park</option>
+          <option value="HERNDON">Town of Herndon</option>
+          <option value="VIENNA">Town of Vienna</option>
+          <option value="PURCELLVILLE">Town of Purcellville</option>
+          <option value="LEESBURG">Town of Leesburg</option>
+          <option value="DUMFRIES">Town of Dumfries</option>
+        </optgroup>
+
       </select>
     </div>
 
@@ -175,6 +197,10 @@
   const PAGE_SIZE    = 20;
   const AUTO_TRAIN_AFTER_FEEDBACK = true;
 
+  let feedbackState = {}; // { postingId: 'like' | 'dislike' } — this client's existing feedback
+
+  const API_SHARED_SECRET = '1febeea3-9fa2-4778-938d-f70738c00befad1d9c72-c081-4c2e-8ec1-b3ef31c0fabb';
+
   const DEFAULT_CLIENT_ID = '9f68f2aa-fc61-496f-81ed-b89ee5a92cdf';
 
   const CLIENT_ID =
@@ -229,6 +255,36 @@
     }
   }
 
+  /* ── Agency scoping (Federal vs State by source) ──────────── */
+  // Maps f-source option values to the agency optgroup they should expose.
+  // SAM.gov and Acquisition Gateway are federal sources; Virginia eVA is state.
+  const SOURCE_TO_AGENCY_GROUP = {
+    'SAM.gov':                      'Federal',
+    'Acquisition Gateway Forecast': 'Federal',
+    'Virginia eVA':                 'State',
+  };
+
+  function scopeAgencies() {
+    const source      = document.getElementById('f-source').value;
+    const orgEl       = document.getElementById('f-org');
+    const activeLabel = SOURCE_TO_AGENCY_GROUP[source] || null;
+
+    orgEl.querySelectorAll('optgroup').forEach(group => {
+      const visible = activeLabel === null || group.label === activeLabel;
+      group.style.display = visible ? '' : 'none';
+      group.querySelectorAll('option').forEach(opt => {
+        opt.disabled = !visible;
+      });
+    });
+
+    // If the currently selected agency belongs to a now-hidden group, reset it
+    const selected = orgEl.options[orgEl.selectedIndex];
+    if (selected && selected.parentElement.tagName === 'OPTGROUP' &&
+        selected.parentElement.style.display === 'none') {
+      orgEl.value = '';
+    }
+  }
+
   /* ── Clear filters ────────────────────────────────────────── */
   function clearFilters() {
     document.getElementById('f-source').value = '';
@@ -237,6 +293,7 @@
     selectedNaics.clear();
     document.querySelectorAll('.naics-tag.selected').forEach(t => t.classList.remove('selected'));
     scopeContractTypes();
+    scopeAgencies();
   }
 
   /* ── Proxy health check ───────────────────────────────────── */
@@ -380,6 +437,17 @@
       </div>`;
   }
 
+  function renderAiSummary(c) {
+    const summary = (c.ai_summary || '').trim();
+    if (!summary) return '';
+
+    return `
+      <div class="card-ai-summary">
+        <p class="ai-summary-label"><i class="ti ti-sparkles" aria-hidden="true"></i> AI summary</p>
+        <p class="ai-summary-text">${escHtml(summary)}</p>
+      </div>`;
+  }
+
   function toggleDesc(cardId, btn) {
     const container = document.getElementById(cardId);
     if (!container) return;
@@ -416,6 +484,30 @@
     }).catch(err => {
       console.warn('Preference training failed:', err);
     });
+  }
+
+  /* ── Feedback state (persisted server-side, fetched on load) ─ */
+  // NEW: calls GET /api/clients/<client_id>/feedback, a route added to
+  // proxy.py alongside this change. Populates feedbackState so renderCard
+  // can disable Like/Dislike buttons for postings already rated by this
+  // client, instead of only disabling them for 1200ms after each click.
+  async function loadFeedbackState() {
+    const base = document.getElementById('proxy-url').value.trim();
+    if (!CLIENT_ID) return;
+
+    try {
+      const res = await fetch(`${base}/api/clients/${CLIENT_ID}/feedback`, {
+        signal: AbortSignal.timeout(10000)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        feedbackState = data.feedback || {};
+      } else {
+        console.warn('Could not load feedback state:', data.error || res.status);
+      }
+    } catch (err) {
+      console.warn('Could not load feedback state:', err);
+    }
   }
 
   async function sendFeedback(postingId, action, button = null, extra = {}) {
@@ -458,6 +550,7 @@
       }
 
       trainPreferencesInBackground();
+      feedbackState[Number(postingId)] = action;
 
       if (button) {
         button.innerHTML = 'Saved';
@@ -467,7 +560,7 @@
         }, 1200);
       }
 
-      if (action === 'not_interested' || action === 'dismissed') {
+      if (action === 'dislike') {
         currentItems = currentItems.filter(item => Number(item.id) !== Number(postingId));
         renderResults(currentItems, currentTotal, currentOffset);
       }
@@ -492,6 +585,14 @@
     const place   = c.place_of_performance || 'Virginia';
     const posted  = c.posted_date || c.postedDate;
     const status  = c.award_status || c.typeLabel || c.type || '—';
+
+    // NEW: check whether this client already rated this posting, and
+    // disable both feedback buttons if so, since client_feedback now
+    // enforces one row per (client_id, posting_id).
+    const existingAction  = feedbackState[Number(c.id)];
+    const feedbackDisabled = existingAction ? 'disabled' : '';
+    const likeLabel    = existingAction === 'like'    ? 'Liked'    : 'Like';
+    const dislikeLabel = existingAction === 'dislike' ? 'Disliked' : 'Dislike';
 
     return `
       <div class="card">
@@ -528,28 +629,25 @@
             ? `<a href="${escHtml(c.url || c.link)}"
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="view-link"
-                  onclick="sendFeedback(${Number(c.id) || 0}, 'clicked', null, { url: this.href })">
+                  class="view-link">
                   <i class="ti ti-external-link" aria-hidden="true"></i>View posting
                </a>`
             : ''}
         </div>
         ${renderRelevanceReasons(c)}
         ${renderDescription(c)}
+        ${renderAiSummary(c)}
         <div class="feedback-row">
           <button class="feedback-btn positive"
-                  onclick="sendFeedback(${Number(c.id) || 0}, 'highly_relevant', this)">
-            <i class="ti ti-thumb-up" aria-hidden="true"></i> Good match
+                  ${feedbackDisabled}
+                  onclick="sendFeedback(${Number(c.id) || 0}, 'like', this)">
+            <i class="ti ti-thumb-up" aria-hidden="true"></i> ${likeLabel}
           </button>
-
-          <button class="feedback-btn positive"
-                  onclick="sendFeedback(${Number(c.id) || 0}, 'saved', this)">
-            <i class="ti ti-bookmark" aria-hidden="true"></i> Save
-          </button>
-
+        
           <button class="feedback-btn negative"
-                  onclick="sendFeedback(${Number(c.id) || 0}, 'not_interested', this)">
-            <i class="ti ti-thumb-down" aria-hidden="true"></i> Not interested
+                  ${feedbackDisabled}
+                  onclick="sendFeedback(${Number(c.id) || 0}, 'dislike', this)">
+            <i class="ti ti-thumb-down" aria-hidden="true"></i> ${dislikeLabel}
           </button>
         </div>
       </div>`;
@@ -573,6 +671,7 @@
     if (ptype)                   params.set('contractType', ptype);
     if (org)                     params.set('agency', org);
     if (selectedNaics.size > 0)  params.set('naics', [...selectedNaics].join(','));
+    params.set('split', 'validation');
 
     let endpoint = `${base}/api/opportunities`;
     if (sortField === 'relevance') {
@@ -582,7 +681,6 @@
         return;
       }
       endpoint = `${base}/api/clients/${CLIENT_ID}/ranked-opportunities`;
-      params.set('candidateLimit', 1000);
       params.set('excludeNegativeFeedback', 'true');
     } else {
       params.set('sortBy', sortField);
@@ -590,6 +688,10 @@
     }
 
     try {
+      // NEW: refresh feedbackState before rendering so buttons reflect
+      // the latest saved likes/dislikes for this client.
+      await loadFeedbackState();
+
       const res = await fetch(`${endpoint}?${params}`, {
         signal: AbortSignal.timeout(30000)
       });

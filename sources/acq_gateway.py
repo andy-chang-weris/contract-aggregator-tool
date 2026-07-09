@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Acquisition Gateway Forecast parser — Virginia contracts, allowed types + allowed NAICS only.
+Acquisition Gateway Forecast parser — allowed agencies + allowed types + allowed NAICS only.
 """
 
 import requests
@@ -19,6 +19,33 @@ HEADERS = {
     "Sec-Ch-Ua-Platform": '"Windows"',
     "Referer": "https://acquisitiongateway.gov/",
 }
+
+# ── Allowed agencies ──────────────────────────────────────────────────────────
+# Only store contracts posted by one of these agencies (matched against the
+# combined agency/organization text, case-insensitive substring match).
+# Mirrors the agency filter exposed in the UI.
+AGENCY_KEYWORDS = {
+    "DOT":   ["DEPARTMENT OF TRANSPORTATION"],
+    "DHS":   ["DEPARTMENT OF HOMELAND SECURITY", "HOMELAND SECURITY"],
+    "FHWA":  ["FEDERAL HIGHWAY"],
+    "FRA":   ["FEDERAL RAILROAD"],
+    "FMCSA": ["FEDERAL MOTOR CARRIER SAFETY"],
+    "FAA":   ["FEDERAL AVIATION"],
+    "CBP":   ["CUSTOMS AND BORDER PROTECTION", "CUSTOMS & BORDER PROTECTION"],
+    "NHTSA": ["NATIONAL HIGHWAY TRAFFIC SAFETY"],
+    "TSA":   ["TRANSPORTATION SECURITY"],
+    "FEMA":  ["FEDERAL EMERGENCY MANAGEMENT"],
+}
+
+def is_allowed_agency(agency: str | None, organization: str | None = None) -> bool:
+    text = f"{agency or ''} {organization or ''}".upper()
+    if not text.strip():
+        return False
+    return any(
+        keyword in text
+        for keywords in AGENCY_KEYWORDS.values()
+        for keyword in keywords
+    )
 
 # ── Allowed contract types ────────────────────────────────────────────────────
 AG_ALLOWED_TYPES = {
@@ -60,16 +87,6 @@ def parse_unix_date(value):
         return datetime.fromtimestamp(int(value), tz=timezone.utc).strftime("%Y-%m-%d")
     except (ValueError, TypeError, OSError):
         return None
-
-# ── Virginia matching ─────────────────────────────────────────────────────────
-def is_virginia(place: str | None) -> bool:
-    if not place:
-        return False
-    p = place.strip().upper()
-    return (
-        "VIRGINIA" in p
-        or re.search(r'\bVA\b', p) is not None
-    )
 
 
 def clean_html(text):
@@ -136,7 +153,7 @@ def fetch_page(page_number):
 
 
 def fetch_and_parse():
-    """Fetch all pages, return only Virginia + allowed-type + allowed-NAICS postings."""
+    """Fetch all pages, return only allowed-agency + allowed-type + allowed-NAICS postings."""
     all_postings = []
     page = 1
 
@@ -173,10 +190,10 @@ def fetch_and_parse():
         time.sleep(0.2)
         _, listings = fetch_page(page)
 
-    # Virginia filter
+    # Agency filter
     before = len(all_postings)
-    all_postings = [p for p in all_postings if is_virginia(p.get("place_of_performance"))]
-    print(f"  [acq_gateway] Virginia filter: {before:,} → {len(all_postings):,} records.")
+    all_postings = [p for p in all_postings if is_allowed_agency(p.get("agency"), p.get("organization"))]
+    print(f"  [acq_gateway] Agency filter: {before:,} → {len(all_postings):,} records.")
 
     # Contract type filter
     before = len(all_postings)

@@ -45,7 +45,7 @@ BLOCK_RE   = re.compile(
 )
 SPACE_RE   = re.compile(r"\s+")
 
-# Solr query candidates — tries each until one returns results
+# Solr query candidates -- tries each until one returns results
 OPEN_QUERIES = [
     ("*:*",          ['status:"Open"']),
     ("*:*",          ["status:Open"]),
@@ -74,6 +74,63 @@ def get_eva_contract_type(doc: dict) -> str | None:
         if substring in doccddesc:
             return label
     return None
+
+
+# ── Allowed agencies ──────────────────────────────────────────────────────────
+# Client scope: VDOT plus city/county governments in Northern Virginia
+# (Planning District 8 / NVRC member area). Case-insensitive substring match
+# against eVA's `agencyname` field. Each keyword is specific enough that,
+# against the agencies seen in current eVA data, it does not collide with any
+# non-Northern-Virginia locality. If eVA later surfaces a colliding name,
+# tighten the keyword to the full agency name.
+EVA_ALLOWED_AGENCIES: list[str] = [
+    # VDOT
+    "VIRGINIA DEPARTMENT OF TRANSPORTATION",
+
+    # Northern Virginia counties
+    "FAIRFAX",           # County of Fairfax, Fairfax County Schools
+    "ARLINGTON",         # Arlington County
+    "LOUDOUN",           # County of Loudoun, Loudoun County Public Schools, Loudoun Water
+    "PRINCE WILLIAM",    # Prince William County (+ schools)
+
+    # Northern Virginia independent cities
+    "ALEXANDRIA",        # City of Alexandria, Alexandria City Public Schools
+    "FALLS CHURCH",      # City of Falls Church
+    "MANASSAS",          # City of Manassas AND City of Manassas Park
+    # ("City of Fairfax" is already covered by the FAIRFAX keyword.)
+
+    # Northern Virginia incorporated towns
+    "HERNDON",           # Town of Herndon
+    "VIENNA",            # Town of Vienna
+    "PURCELLVILLE",      # Town of Purcellville
+    "LEESBURG",          # Town of Leesburg
+    "DUMFRIES",          # Town of Dumfries
+
+    # NoVA regional/utility bodies tied to the above localities
+    "ALEXRENEW",         # Alexandria Renew Enterprises (Alexandria wastewater)
+    "NORTHERN VIRGINIA", # e.g. Juvenile Detention Commission for Northern Virginia
+
+    # ── Optional "vicinity" extension (adjacent PD7 & PD16 -- NOT part of PD8) ──
+    # Uncomment only if the client wants the wider Fredericksburg / Northern
+    # Shenandoah commuter belt.
+    # "STAFFORD",                              # Stafford County (PD16)
+    # "SPOTSYLVANIA",                          # Spotsylvania County (PD16)
+    # "CAROLINE",                              # Caroline County (PD16)
+    # "BOWLING GREEN",                         # Town of Bowling Green (PD16)
+    # "GEORGE WASHINGTON REGIONAL COMMISSION", # PD16
+    # "CLARKE",                                # Clarke County (PD7)
+    # "WARREN",                                # Warren County (PD7)
+    # "NORTHERN SHENANDOAH",                   # Northern Shenandoah Valley RC (PD7)
+]
+
+
+def is_allowed_agency_eva(agency: str | None) -> bool:
+    """True if the eVA agency is VDOT or a Northern Virginia locality on the
+    allow-list. Case-insensitive substring match against `agencyname`."""
+    if not agency:
+        return False
+    text = agency.upper()
+    return any(keyword in text for keyword in EVA_ALLOWED_AGENCIES)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -160,7 +217,7 @@ class EvaClient:
                     return text
             except urllib.error.HTTPError as e:
                 if e.code in {403, 429}:
-                    raise RuntimeError(f"HTTP {e.code} — blocked") from e
+                    raise RuntimeError(f"HTTP {e.code} -- blocked") from e
                 if attempt < 3:
                     time.sleep(1.5 * (attempt + 1))
                     continue
@@ -274,7 +331,8 @@ def fetch_and_parse() -> list[dict]:
     """
     Fetches all Open opportunities from eVA and returns
     a list of normalized postings ready for store_postings().
-    Only RFP, RFI, and Quick Quote records are included.
+    Only RFP, RFI, and Quick Quote records are included, and only records
+    posted by VDOT or a Northern Virginia locality on the agency allow-list.
     """
     target_url = load_target_url()
     client     = EvaClient(target_url)
@@ -292,9 +350,10 @@ def fetch_and_parse() -> list[dict]:
     print(f"  [eva] Fetching {total} Open opportunities (RFP/RFI/Quick Quote only)...")
 
     # Step 4: Paginate through all records
-    all_postings = []
-    skipped_type = 0
-    start        = 0
+    all_postings   = []
+    skipped_type   = 0
+    skipped_agency = 0
+    start          = 0
 
     while start < total:
         rows    = min(PAGE_SIZE, total - start)
@@ -317,14 +376,21 @@ def fetch_and_parse() -> list[dict]:
                 skipped_type += 1
                 continue
 
+            # Only include VDOT + Northern Virginia localities
+            if not is_allowed_agency_eva(doc.get("agencyname")):
+                skipped_agency += 1
+                continue
+
             posting = normalize_doc(doc, target_url, contract_type)
             all_postings.append(posting)
 
         start += len(docs)
-        print(f"  [eva] {len(all_postings):,} kept / {skipped_type:,} skipped (type) / {start:,} scanned", end="\r")
+        print(f"  [eva] {len(all_postings):,} kept / {skipped_type:,} skipped (type) / "
+              f"{skipped_agency:,} skipped (agency) / {start:,} scanned", end="\r")
 
         if len(docs) < rows:
             break
 
-    print(f"\n  [eva] Done. {len(all_postings):,} RFP/RFI/Quick Quote records kept, {skipped_type:,} other types skipped.")
+    print(f"\n  [eva] Done. {len(all_postings):,} kept "
+          f"({skipped_type:,} skipped by type, {skipped_agency:,} skipped by agency).")
     return all_postings

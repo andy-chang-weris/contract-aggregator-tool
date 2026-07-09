@@ -122,6 +122,7 @@ def setup_database():
         "source_listing_id":    "TEXT",
         "date_scraped":         "TEXT",
         "raw_response":         "TEXT",
+        "ai_summary":           "TEXT",
     }
 
     # Fetch existing columns from PostgreSQL information schema
@@ -209,13 +210,8 @@ def setup_ml_tables():
 
             action TEXT NOT NULL CHECK (
                 action IN (
-                    'viewed',
-                    'clicked',
-                    'saved',
-                    'not_interested',
-                    'highly_relevant',
-                    'applied',
-                    'dismissed'
+                   'like', 
+                   'dislike'
                 )
             ),
 
@@ -257,6 +253,28 @@ def setup_ml_tables():
             FOREIGN KEY (posting_id)
             REFERENCES postings(id)
             ON DELETE SET NULL;
+        END $$;
+    """)
+
+    # One feedback row per (client, posting) — required so POST /api/feedback
+    # in proxy.py can upsert on repeat like/dislike instead of inserting a
+    # new duplicate row every time the button is clicked. If duplicate
+    # (client_id, posting_id) rows already exist, this ADD CONSTRAINT will
+    # fail; deduplicate them first (keep the latest by created_at) before
+    # re-running this migration.
+    cursor.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1
+                FROM pg_constraint
+                WHERE conrelid = 'client_feedback'::regclass
+                AND conname = 'uq_client_feedback_client_posting'
+            ) THEN
+                ALTER TABLE client_feedback
+                ADD CONSTRAINT uq_client_feedback_client_posting
+                UNIQUE (client_id, posting_id);
+            END IF;
         END $$;
     """)
 

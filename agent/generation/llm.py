@@ -138,6 +138,71 @@ class OpenAICompatibleLLM(BaseLLM):
             raise LLMError(f"Unexpected LLM response shape: {json.dumps(data)[:500]}") from exc
 
 
+class BedrockLLM(BaseLLM):
+    """Calls an Amazon Bedrock text model through the Converse API."""
+
+    def __init__(self, settings: Settings) -> None:
+        if not settings.llm_model:
+            raise LLMError("RAG_LLM_MODEL is required for Bedrock provider.")
+        self.settings = settings
+        self.model_id = settings.llm_model
+        self.region = settings.aws_region
+        try:
+            import boto3  # type: ignore
+        except Exception as exc:  # pragma: no cover - exercised only when dependency missing
+            raise LLMError("boto3 is required for RAG_LLM_PROVIDER=bedrock.") from exc
+        self.client = boto3.client("bedrock-runtime", region_name=self.region)
+
+    def answer(self, question: str, results: list[SearchResult]) -> str:
+        return self._converse(
+            system_prompt=SYSTEM_PROMPT,
+            user_prompt=build_user_prompt(question, results),
+        )
+
+    def answer_general(self, question: str) -> str:
+        return self._converse(
+            system_prompt=GENERAL_SYSTEM_PROMPT,
+            user_prompt=question,
+        )
+
+    def _converse(self, system_prompt: str, user_prompt: str) -> str:
+        inference_config: dict[str, Any] = {
+            "maxTokens": self.settings.max_tokens,
+        }
+        if self.settings.temperature >= 0:
+            inference_config["temperature"] = self.settings.temperature
+
+        try:
+            response = self.client.converse(
+                modelId=self.model_id,
+                system=[{"text": system_prompt}],
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [{"text": user_prompt}],
+                    }
+                ],
+                inferenceConfig=inference_config,
+            )
+        except Exception as exc:
+            raise LLMError(f"Bedrock model invocation failed: {exc}") from exc
+
+        content = (
+            response.get("output", {})
+            .get("message", {})
+            .get("content", [])
+        )
+        text_parts = [
+            str(block["text"]).strip()
+            for block in content
+            if isinstance(block, dict) and block.get("text")
+        ]
+        answer = "\n".join(part for part in text_parts if part).strip()
+        if not answer:
+            raise LLMError(f"Unexpected Bedrock response shape: {json.dumps(response, default=str)[:500]}")
+        return answer
+
+
 class OllamaLLM(BaseLLM):
     """Calls a reachable Ollama server. Useful only when Codex/local env has one configured."""
 
@@ -200,11 +265,13 @@ def make_llm(settings: Settings) -> BaseLLM:
     provider = settings.llm_provider.lower()
     if provider == "mock":
         return MockLLM()
+    if provider in {"bedrock", "aws-bedrock", "aws_bedrock"}:
+        return BedrockLLM(settings)
     if provider == "openai":
         return OpenAICompatibleLLM(settings, default_base_url="https://api.openai.com/v1")
     if provider in {"openai-compatible", "openai_compatible", "cloud"}:
         return OpenAICompatibleLLM(settings)
     if provider == "ollama":
         return OllamaLLM(settings)
-    raise LLMError("RAG_LLM_PROVIDER must be one of: mock, openai, openai-compatible, ollama")
+    raise LLMError("RAG_LLM_PROVIDER must be one of: mock, bedrock, openai, openai-compatible, ollama")
 

@@ -26,7 +26,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--top-k", type=int, help="Number of contracts to retrieve per question.")
     parser.add_argument("--index-path", help="Path to the JSON vector index.")
     parser.add_argument("--rebuild-index", action="store_true", help="Rebuild the index before starting chat.")
-    parser.add_argument("--llm-provider", choices=["mock", "openai", "openai-compatible", "ollama"], help="LLM provider override.")
+    parser.add_argument("--llm-provider", choices=["mock", "bedrock", "openai", "openai-compatible", "ollama"], help="LLM provider override.")
     return parser.parse_args()
 
 

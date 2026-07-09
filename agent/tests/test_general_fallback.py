@@ -20,6 +20,7 @@ class FakeRetriever:
 
     def __init__(self) -> None:
         self.queries: list[str] = []
+        self.return_results = True
         self.result = SearchResult(
             document=Document(
                 doc_id="contract-123",
@@ -38,7 +39,7 @@ class FakeRetriever:
 
     def search(self, query: str) -> list[SearchResult]:
         self.queries.append(query)
-        return [self.result]
+        return [self.result] if self.return_results else []
 
 
 class FakeLLM:
@@ -54,7 +55,7 @@ class FakeLLM:
 
     def answer_general(self, question: str) -> str:
         self.general_calls.append(question)
-        return "This is a general model response, not using retrieved contract records."
+        return "This is a normal chatbot answer."
 
 
 class GeneralFallbackTest(unittest.TestCase):
@@ -73,8 +74,7 @@ class GeneralFallbackTest(unittest.TestCase):
                 self.assertEqual(llm.calls, [])
                 self.assertEqual(llm.general_calls, [query])
                 self.assertEqual(response.sources, [])
-                self.assertIn("general model response", response.answer.lower())
-                self.assertIn("not using retrieved contract records", response.answer.lower())
+                self.assertIn("normal chatbot answer", response.answer.lower())
                 self.assertNotIn("Retrieved sources:", response.answer)
                 self.assertNotIn("Cloud Migration Support", response.answer)
                 self.assertNotIn("contract-123", response.answer)
@@ -100,6 +100,20 @@ class GeneralFallbackTest(unittest.TestCase):
                 self.assertIn("Retrieved sources:", response.answer)
                 self.assertIn("Cloud Migration Support", response.answer)
                 self.assertIn("contract-123", response.answer)
+
+    def test_contract_query_without_retrieval_match_returns_not_found(self) -> None:
+        retriever = FakeRetriever()
+        retriever.return_results = False
+        llm = FakeLLM()
+        agent = RagAgent(load_settings(), retriever, llm)
+
+        response = agent.ask("find a contract for lunar elevator maintenance")
+
+        self.assertEqual(retriever.queries, ["find a contract for lunar elevator maintenance"])
+        self.assertEqual(llm.calls, [])
+        self.assertEqual(llm.general_calls, [])
+        self.assertEqual(response.sources, [])
+        self.assertIn("not able to find a relevant contract in the database", response.answer.lower())
 
 
 if __name__ == "__main__":

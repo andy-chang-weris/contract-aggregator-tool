@@ -70,3 +70,32 @@ resource "aws_iam_role_policy_attachment" "task_secret_access" {
   policy_arn = aws_iam_policy.read_db_secret.arn
 
 }
+
+resource "aws_iam_policy" "invoke_bedrock_model" {
+  name = "contract-aggregator-invoke-bedrock-model"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+
+    Statement = [
+      {
+        Effect = "Allow"
+
+        Action = [
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream"
+        ]
+
+        Resource = [
+          "arn:aws:bedrock:${var.aws_region}::foundation-model/deepseek.v3.2",
+          "arn:aws:bedrock:${var.aws_region}::foundation-model/cohere.embed-english-v3"
+        ]
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "task_bedrock_access" {
+  role       = aws_iam_role.ecs_task.name
+  policy_arn = aws_iam_policy.invoke_bedrock_model.arn
+}

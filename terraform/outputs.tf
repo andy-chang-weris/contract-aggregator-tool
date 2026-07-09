@@ -13,3 +13,7 @@ output "db_endpoint" {
 output "db_secret_name" {
   value = aws_secretsmanager_secret.db.name
 }
+
+output "app_url" {
+  value = "http://${aws_lb.web.dns_name}"
+}

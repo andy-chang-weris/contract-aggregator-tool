@@ -2,7 +2,7 @@ param(
     [string]$Tag,
     [string]$Region = "us-east-1",
     [string]$RepositoryName = "contract-aggregator-tool",
-    [string]$ComposeFile = "docker-compose.yml",
+    [string]$Dockerfile = "Dockerfile",
     [switch]$PushLatest
 )
 
@@ -40,9 +40,9 @@ if (-not $Tag) {
 }
 
 $ProjectDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ComposePath = Join-Path $ProjectDir $ComposeFile
-if (-not (Test-Path $ComposePath)) {
-    throw "Compose file was not found: $ComposePath"
+$DockerfilePath = Join-Path $ProjectDir $Dockerfile
+if (-not (Test-Path $DockerfilePath)) {
+    throw "Dockerfile was not found: $DockerfilePath"
 }
 
 $RepoUrl = "$((Get-AwsAccountId)).dkr.ecr.$Region.amazonaws.com/$RepositoryName"
@@ -55,13 +55,8 @@ Write-Host "Logging Docker into ECR..."
 $registry = ($RepoUrl -split "/")[0]
 aws ecr get-login-password --region $Region | docker login --username AWS --password-stdin $registry
 
-Write-Host "Building image with Docker Compose..."
-$env:APP_IMAGE_NAME = $ImageTag
-try {
-    docker compose -f $ComposePath build app
-} finally {
-    Remove-Item Env:APP_IMAGE_NAME -ErrorAction SilentlyContinue
-}
+Write-Host "Building production image..."
+docker build --file $DockerfilePath --tag $ImageTag $ProjectDir
 
 Write-Host "Pushing image tag $Tag..."
 docker push $ImageTag

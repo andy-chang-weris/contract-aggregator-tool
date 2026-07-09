@@ -33,14 +33,22 @@ class RagAgent:
         return cls(resolved_settings, retriever, llm)
 
     def ask(self, question: str) -> AgentResponse:
-        if _should_answer_without_rag(question):
+        if not is_contract_related_query(question):
             answer = self.llm.answer_general(question)
-            answer = _append_general_fallback_disclosure(answer)
             response = AgentResponse(answer=answer, sources=[], index_source="general-model")
             self.last_response = response
             return response
 
         results = self.retriever.search(question)
+        if not results:
+            response = AgentResponse(
+                answer=_contract_not_found_answer(),
+                sources=[],
+                index_source=self.retriever.source_label,
+            )
+            self.last_response = response
+            return response
+
         answer = self.llm.answer(question, results)
         answer = _append_source_citations(answer, results)
         response = AgentResponse(answer=answer, sources=results, index_source=self.retriever.source_label)
@@ -71,39 +79,44 @@ def _append_source_citations(answer: str, results: list[SearchResult]) -> str:
     return answer.rstrip() + "\n" + "\n".join(lines)
 
 
-def _append_general_fallback_disclosure(answer: str) -> str:
-    disclosure = "Retrieved contract records were not used for this answer."
-    stripped = answer.strip()
-    if disclosure.lower() in stripped.lower():
-        return stripped
-    if not stripped:
-        return disclosure
-    return f"{stripped}\n\n{disclosure}"
+def _contract_not_found_answer() -> str:
+    return (
+        "I was not able to find a relevant contract in the database for that question. "
+        "Try using different keywords, an agency name, a NAICS code, a contract type, or a deadline."
+    )
 
 
-_GENERAL_GREETINGS = {
-    "good afternoon",
-    "good evening",
-    "good morning",
-    "hello",
-    "hey",
-    "hi",
-    "yo",
-}
-
-_GENERAL_HELP_QUERIES = {
-    "help",
-    "how do you work",
-    "what can you do",
-    "what do you do",
-    "what does this agent do",
-    "what does this model do",
-    "what does this tool do",
-    "what is this",
-    "what is this agent",
-    "what is this model",
-    "what is this tool",
-    "who are you",
+_CONTRACT_TERMS = {
+    "acquisition",
+    "agency",
+    "award",
+    "bid",
+    "bids",
+    "contract",
+    "contracts",
+    "contractor",
+    "deadline",
+    "eva",
+    "federal",
+    "government",
+    "naics",
+    "opportunity",
+    "opportunities",
+    "procurement",
+    "proposal",
+    "quote",
+    "rfb",
+    "rfi",
+    "rfp",
+    "rfq",
+    "sam",
+    "setaside",
+    "set-aside",
+    "solicitation",
+    "solicitations",
+    "vendor",
+    "vendors",
+    "virginia",
 }
 
 
@@ -112,11 +125,19 @@ def _normalize_general_query(question: str) -> str:
     return " ".join(normalized.split())
 
 
-def _should_answer_without_rag(question: str) -> bool:
+def is_contract_related_query(question: str) -> bool:
     normalized = _normalize_general_query(question)
     if not normalized:
+        return False
+    if re.fullmatch(r"(hi|hello|hey|yo|good morning|good afternoon|good evening)", normalized):
+        return False
+    tokens = set(normalized.split())
+    if tokens.intersection(_CONTRACT_TERMS):
         return True
-    if normalized in _GENERAL_GREETINGS or normalized in _GENERAL_HELP_QUERIES:
-        return True
-    return bool(re.fullmatch(r"(what|who) (are|is) (you|this assistant|this model)", normalized))
+    return bool(
+        re.search(
+            r"\b(find|show|search|summarize|recommend|list)\b.*\b(rfps?|rfis?|rfqs?|bids?|awards?|vendors?)\b",
+            normalized,
+        )
+    )
 

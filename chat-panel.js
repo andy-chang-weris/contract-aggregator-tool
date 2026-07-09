@@ -99,7 +99,7 @@ export class ContractChatPanel {
   constructor(root, options = {}) {
     this.root = root;
     this.options = {
-      endpoint: 'http://localhost:5055/api/chat',
+      endpoint: '/api/chat',
       mode: 'api',
       initialOpen: false,
       title: 'Contract Assistant',

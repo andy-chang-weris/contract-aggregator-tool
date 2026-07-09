@@ -16,16 +16,38 @@ resource "aws_security_group" "web" {
   vpc_id      = aws_default_vpc.default.id
 
   ingress {
-    from_port   = 8000
-    to_port     = 8000
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    from_port = 8000
+    to_port   = 8000
+    protocol  = "tcp"
+    security_groups = [
+      aws_security_group.alb.id
+    ]
   }
 
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_security_group" "alb" {
+  name        = "contract-aggregator-alb"
+  description = "Allow public HTTP traffic to the application load balancer"
+  vpc_id      = aws_default_vpc.default.id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 8000
+    to_port     = 8000
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
@@ -46,6 +68,15 @@ resource "aws_default_route_table" "default" {
 
 resource "aws_network_acl" "app" {
   vpc_id = aws_default_vpc.default.id
+
+  ingress {
+    protocol   = "tcp"
+    rule_no    = 90
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 80
+    to_port    = 80
+  }
 
   ingress {
     protocol   = "tcp"
@@ -135,6 +166,15 @@ resource "aws_network_acl" "app" {
     cidr_block = aws_default_vpc.default.cidr_block
     from_port  = 5432
     to_port    = 5432
+  }
+
+  egress {
+    protocol   = "tcp"
+    rule_no    = 140
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 8000
+    to_port    = 8000
   }
 }
 

@@ -1,6 +1,6 @@
 # Terminal RAG Contract Agent
 
-This folder contains a standalone terminal RAG assistant for government contract opportunities. The default path runs offline with bundled sample data, a deterministic hash-vector index, and a mock LLM. Optional PostgreSQL, SQL dump, sentence-transformers, OpenAI-compatible, OpenAI, and Ollama paths are enabled through environment variables.
+This folder contains a standalone terminal RAG assistant for government contract opportunities. The default path runs offline with bundled sample data, a deterministic hash-vector index, and a mock LLM. Optional PostgreSQL, SQL dump, sentence-transformers, AWS Bedrock, OpenAI-compatible, OpenAI, and Ollama paths are enabled through environment variables.
 
 ## Quick Start
 
@@ -116,6 +116,16 @@ Default deterministic provider:
 RAG_LLM_PROVIDER=mock
 ```
 
+AWS Bedrock open-weight model provider:
+
+```bash
+RAG_LLM_PROVIDER=bedrock
+RAG_LLM_MODEL=deepseek.v3.2
+AWS_DEFAULT_REGION=us-east-1
+```
+
+The deployed AWS app uses Bedrock with `deepseek.v3.2` by default. The ECS task role must allow `bedrock:InvokeModel` for the configured foundation model.
+
 Official OpenAI API:
 
 ```bash
@@ -169,6 +179,16 @@ python index.py --source sample --rebuild
 ```
 
 The sentence-transformers path may need network access on first use to download the model. Keep `RAG_EMBEDDING_PROVIDER=hash` for dependency-light smoke tests.
+
+AWS-managed Jina-v3-class semantic embeddings:
+
+```bash
+RAG_EMBEDDING_PROVIDER=bedrock
+RAG_EMBEDDING_MODEL=cohere.embed-english-v3
+AWS_DEFAULT_REGION=us-east-1
+```
+
+The deployed AWS app is configured to use Bedrock Cohere Embed English v3 for retrieval embeddings. The first retrieval request in a fresh container builds the local vector index with this model, and the index is rebuilt automatically if the configured embedding provider/model changes.
 
 ## Tests
 

@@ -3,7 +3,8 @@
 The default embedder is a deterministic hash-vector embedder that needs no model,
 GPU, API key, or network. A sentence-transformers embedder can be enabled with
 RAG_EMBEDDING_PROVIDER=sentence-transformers when the package and model are
-available in the environment.
+available in the environment. AWS Bedrock Cohere Embed v3 can be enabled with
+RAG_EMBEDDING_PROVIDER=bedrock.
 """
 
 from __future__ import annotations
@@ -37,6 +38,10 @@ class Embedder(Protocol):
 
     def embed(self, text: str) -> dict[str, float]:
         ...
+
+
+def _as_sparse_dict(vector: Any) -> dict[str, float]:
+    return {str(index): float(value) for index, value in enumerate(vector) if float(value)}
 
 
 class HashVectorEmbedder:
@@ -85,16 +90,76 @@ class SentenceTransformerEmbedder:
 
     def embed(self, text: str) -> dict[str, float]:
         vector = self._model.encode(text, normalize_embeddings=True)
-        return {str(index): float(value) for index, value in enumerate(vector) if float(value)}
+        return _as_sparse_dict(vector)
+
+    def embed_documents(self, texts: list[str]) -> list[dict[str, float]]:
+        vectors = self._model.encode(texts, normalize_embeddings=True)
+        return [_as_sparse_dict(vector) for vector in vectors]
+
+    def embed_query(self, text: str) -> dict[str, float]:
+        return self.embed(text)
 
 
-def make_embedder(provider: str, model: str) -> Embedder:
+class BedrockCohereEmbedder:
+    """AWS-managed Cohere Embed v3 provider for production semantic retrieval."""
+
+    def __init__(self, model_name: str, region: str = "us-east-1", batch_size: int = 64) -> None:
+        try:
+            import boto3  # type: ignore
+        except Exception as exc:  # pragma: no cover - exercised only when dependency missing
+            raise RuntimeError("boto3 is required for RAG_EMBEDDING_PROVIDER=bedrock.") from exc
+
+        self.provider = "bedrock"
+        self.model = model_name or "cohere.embed-english-v3"
+        self.region = region
+        self.batch_size = batch_size
+        self._client = boto3.client("bedrock-runtime", region_name=region)
+
+    def embed(self, text: str) -> dict[str, float]:
+        return self.embed_query(text)
+
+    def embed_query(self, text: str) -> dict[str, float]:
+        return self._embed_texts([text], input_type="search_query")[0]
+
+    def embed_documents(self, texts: list[str]) -> list[dict[str, float]]:
+        embeddings: list[dict[str, float]] = []
+        for start in range(0, len(texts), self.batch_size):
+            batch = texts[start : start + self.batch_size]
+            embeddings.extend(self._embed_texts(batch, input_type="search_document"))
+        return embeddings
+
+    def _embed_texts(self, texts: list[str], input_type: str) -> list[dict[str, float]]:
+        if not texts:
+            return []
+
+        payload = {
+            "texts": texts,
+            "input_type": input_type,
+        }
+        response = self._client.invoke_model(
+            modelId=self.model,
+            body=json.dumps(payload),
+            accept="application/json",
+            contentType="application/json",
+        )
+        body = json.loads(response["body"].read())
+        raw_embeddings = body.get("embeddings")
+        if isinstance(raw_embeddings, dict):
+            raw_embeddings = raw_embeddings.get("float") or raw_embeddings.get("floats")
+        if not isinstance(raw_embeddings, list) or len(raw_embeddings) != len(texts):
+            raise RuntimeError(f"Unexpected Bedrock embedding response shape: {json.dumps(body)[:500]}")
+        return [_as_sparse_dict(vector) for vector in raw_embeddings]
+
+
+def make_embedder(provider: str, model: str, aws_region: str = "us-east-1") -> Embedder:
     normalized = provider.strip().lower()
     if normalized in {"hash", "hash-vector", "mock"}:
         return HashVectorEmbedder()
     if normalized in {"sentence-transformers", "sentence_transformers", "st"}:
         return SentenceTransformerEmbedder(model)
-    raise RuntimeError("RAG_EMBEDDING_PROVIDER must be one of: hash, sentence-transformers")
+    if normalized in {"bedrock", "aws-bedrock", "aws_bedrock", "cohere-bedrock", "cohere_bedrock"}:
+        return BedrockCohereEmbedder(model, region=aws_region)
+    raise RuntimeError("RAG_EMBEDDING_PROVIDER must be one of: hash, sentence-transformers, bedrock")
 
 
 def _cached_huggingface_model_path(model_name: str) -> str | None:
@@ -142,9 +207,15 @@ class VectorIndex:
         self.entries: list[dict[str, Any]] = []
 
     def build(self, documents: list[Document]) -> None:
+        texts = [document.text for document in documents]
+        embed_documents = getattr(self.embedder, "embed_documents", None)
+        if callable(embed_documents):
+            embeddings = embed_documents(texts)
+        else:
+            embeddings = [self.embedder.embed(text) for text in texts]
         self.entries = [
-            {"document": document.to_dict(), "embedding": self.embedder.embed(document.text)}
-            for document in documents
+            {"document": document.to_dict(), "embedding": embedding}
+            for document, embedding in zip(documents, embeddings)
         ]
 
     def save(self, path: Path) -> None:
@@ -158,18 +229,20 @@ class VectorIndex:
         path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
     @classmethod
-    def load(cls, path: Path) -> "VectorIndex":
+    def load(cls, path: Path, aws_region: str = "us-east-1") -> "VectorIndex":
         payload = json.loads(path.read_text(encoding="utf-8"))
         embedder = make_embedder(
             str(payload.get("embedding_provider") or "hash"),
             str(payload.get("embedding_model") or "BAAI/bge-small-en-v1.5"),
+            aws_region=aws_region,
         )
         index = cls(embedder=embedder)
         index.entries = list(payload.get("entries", []))
         return index
 
     def search(self, query: str, top_k: int = 5) -> list[SearchResult]:
-        query_embedding = self.embedder.embed(query)
+        embed_query = getattr(self.embedder, "embed_query", None)
+        query_embedding = embed_query(query) if callable(embed_query) else self.embedder.embed(query)
         scored: list[SearchResult] = []
         for entry in self.entries:
             score = _dot(query_embedding, entry.get("embedding", {}))
@@ -192,7 +265,7 @@ def build_index(settings: Settings) -> tuple[VectorIndex, int, str]:
     documents = records_to_documents(records)
     if not documents:
         raise RuntimeError(f"No indexable contract documents loaded from {source_label}.")
-    vector_index = VectorIndex(make_embedder(settings.embedding_provider, settings.embedding_model))
+    vector_index = VectorIndex(make_embedder(settings.embedding_provider, settings.embedding_model, settings.aws_region))
     vector_index.build(documents)
     vector_index.save(settings.index_path)
     return vector_index, len(documents), source_label
@@ -228,4 +301,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

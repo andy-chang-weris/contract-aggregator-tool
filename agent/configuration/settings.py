@@ -85,6 +85,7 @@ class Settings:
     llm_model: str
     llm_base_url: str
     llm_api_key: str
+    aws_region: str
     temperature: float
     max_tokens: int
     request_timeout: int
@@ -115,6 +116,7 @@ def load_settings() -> Settings:
         llm_model=_env("RAG_LLM_MODEL", "mock-contract-rag"),
         llm_base_url=_env("RAG_LLM_BASE_URL", "").rstrip("/"),
         llm_api_key=_env("RAG_LLM_API_KEY", _env("OPENAI_API_KEY", "")),
+        aws_region=_env("AWS_REGION", _env("AWS_DEFAULT_REGION", "us-east-1")),
         temperature=_float_env("RAG_TEMPERATURE", 0.2),
         max_tokens=_int_env("RAG_MAX_TOKENS", 900),
         request_timeout=_int_env("RAG_REQUEST_TIMEOUT", 60),

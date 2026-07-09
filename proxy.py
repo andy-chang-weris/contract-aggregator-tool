@@ -6,9 +6,11 @@ Virginia contracts only — state filter removed.
 import os
 import json
 import time
+import sys
+from pathlib import Path
 import psycopg2
 import psycopg2.extras
-from flask import Flask, jsonify, request
+from flask import Flask, abort, jsonify, request, send_from_directory
 from flask_cors import CORS
 from uuid import UUID
 from preference_training import train_client_preferences
@@ -21,6 +23,11 @@ try:
     load_dotenv()
 except ImportError:
     pass
+
+APP_DIR = Path(__file__).resolve().parent
+AGENT_DIR = APP_DIR / "agent"
+if str(AGENT_DIR) not in sys.path:
+    sys.path.insert(0, str(AGENT_DIR))
 
 app = Flask(__name__)
 CORS(app)
@@ -100,6 +107,32 @@ def get_db():
     )
 
 
+def configure_rag_db_from_secret():
+    if os.environ.get("DB_HOST") and os.environ.get("DB_PASSWORD"):
+        return
+    secret_name = os.environ.get("DB_SECRET_NAME")
+    if not secret_name:
+        return
+    config = get_db_config(secret_name)
+    os.environ.setdefault("DB_HOST", str(config["host"]))
+    os.environ.setdefault("DB_PORT", str(config["port"]))
+    os.environ.setdefault("DB_NAME", str(config["database"]))
+    os.environ.setdefault("DB_USER", str(config["username"]))
+    os.environ.setdefault("DB_PASSWORD", str(config["password"]))
+
+
+def serialize_chat_source(source):
+    metadata = dict(getattr(source, "metadata", {}) or {})
+    return {
+        "score": float(getattr(source, "score", 0.0) or 0.0),
+        "metadata": metadata,
+        "title": metadata.get("title"),
+        "agency": metadata.get("agency") or metadata.get("organization"),
+        "deadline": metadata.get("deadline"),
+        "url": metadata.get("url"),
+    }
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 @app.route("/health")
 def health():
@@ -127,6 +160,35 @@ def health():
         "total_postings_in_db": total,
         "cache_entries_active": active_cache,
         "cache_ttl_seconds":    CACHE_TTL_SECONDS,
+    })
+
+
+@app.route("/api/chat", methods=["POST", "OPTIONS"])
+def chat():
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    payload = request.get_json(silent=True) or {}
+    question = str(payload.get("question") or "").strip()
+    if not question:
+        return jsonify({"error": "question is required"}), 400
+
+    try:
+        configure_rag_db_from_secret()
+        from rag import RagAgent
+
+        if not hasattr(app, "_rag_agent"):
+            app._rag_agent = RagAgent.create()
+        response = app._rag_agent.ask(question)
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+    return jsonify({
+        "answer": response.answer,
+        "index_source": response.index_source,
+        "embedding_provider": app._rag_agent.retriever.vector_index.embedder.provider,
+        "embedding_model": app._rag_agent.retriever.vector_index.embedder.model,
+        "sources": [serialize_chat_source(source) for source in response.sources],
     })
 
 
@@ -629,6 +691,19 @@ def ranked_opportunities(client_id):
         "ranked": True,
         "cached": False,
     })
+
+
+@app.route("/")
+def index():
+    return send_from_directory(APP_DIR, "index.html")
+
+
+@app.route("/<path:path>")
+def static_files(path):
+    target = APP_DIR / path
+    if target.is_file():
+        return send_from_directory(APP_DIR, path)
+    abort(404)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

@@ -156,17 +156,24 @@ def cache_set(key, data):
 
 # ── PostgreSQL connection ─────────────────────────────────────────────────────
 def get_db():
-    config = get_db_config(
-        os.environ["DB_SECRET_NAME"]
-    )
+    secret_name = os.environ.get("DB_SECRET_NAME")
+
+    if secret_name:
+        config = get_db_config(secret_name)
+        return psycopg2.connect(
+            host=config["host"],
+            port=config["port"],
+            dbname=config["database"],
+            user=config["username"],
+            password=config["password"],
+        )
 
     return psycopg2.connect(
-
-        host=config["host"],
-        port=config["port"],
-        dbname=config["database"],
-        user=config["username"],
-        password=config["password"],
+        host=os.environ.get("DB_HOST", "localhost"),
+        port=os.environ.get("DB_PORT", "5432"),
+        dbname=os.environ.get("DB_NAME", "govcontracts"),
+        user=os.environ.get("DB_USER", "postgres"),
+        password=os.environ.get("DB_PASSWORD", ""),
     )
 
 

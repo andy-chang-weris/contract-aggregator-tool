@@ -837,8 +837,6 @@ def ranked_opportunities(client_id):
         "cached": False,
     })
 
-<<<<<<< HEAD
-
 @app.route("/")
 def index():
     return send_from_directory(APP_DIR, "index.html")
@@ -850,7 +848,7 @@ def static_files(path):
     if target.is_file():
         return send_from_directory(APP_DIR, path)
     abort(404)
-=======
+
 @app.route("/api/clients/<client_id>/train-ml-model", methods=["POST"])
 @limiter.limit("20 per minute")
 def train_ml_model_endpoint(client_id):
@@ -1060,8 +1058,7 @@ def update_contract_summaries_batch():
         except Exception:
             pass
         return jsonify({"error": "Internal server error"}), 500
->>>>>>> f74cdc6bbff9b4f89b9e7a781885b41f8830030e
-
+    
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     print(f"\n  GovContracts proxy  → http://localhost:{port}")

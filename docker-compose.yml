@@ -1,32 +1,9 @@
 services:
-  ollama:
-    image: ollama/ollama:latest
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_models:/root/.ollama
-
-  ollama-pull:
-    image: ollama/ollama:latest
-    depends_on:
-      - ollama
-    environment:
-      OLLAMA_HOST: http://ollama:11434
-    entrypoint: ["/bin/sh", "-c"]
-    command: >
-      "until ollama list >/dev/null 2>&1; do sleep 1; done;
-      ollama pull qwen2.5:1.5b"
-    volumes:
-      - ollama_models:/root/.ollama
-
   app:
     image: ${APP_IMAGE_NAME:-ai-agent-app:local}
     build:
       context: .
       dockerfile: Dockerfile.compose
-    depends_on:
-      ollama-pull:
-        condition: service_completed_successfully
     ports:
       - "8000:8000"
       - "5000:5000"
@@ -40,13 +17,10 @@ services:
       CHAT_SERVER_PORT: "5055"
       # DB_SECRET_NAME: "contract-aggregator/dev/database"
       AWS_DEFAULT_REGION: "us-east-1"
-      RAG_LLM_PROVIDER: "ollama"
-      RAG_LLM_MODEL: "qwen2.5:1.5b"
-      RAG_LLM_BASE_URL: "http://ollama:11434"
+      RAG_LLM_PROVIDER: "bedrock"
+      RAG_LLM_MODEL: "deepseek.v3.2"
+      RAG_MAX_TOKENS: "1200"
       DEV_RELOAD: "1"
     volumes:
       - .:/app
       - ${USERPROFILE}/.aws:/root/.aws:ro
-
-volumes:
-  ollama_models:

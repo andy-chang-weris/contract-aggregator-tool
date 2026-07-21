@@ -29,7 +29,7 @@
         <span id="status-label">Proxy not checked</span>
       </div>
       <input type="text" class="proxy-url-input" id="proxy-url"
-        value="http://localhost:5000"
+        value="window.location.origin"
         title="URL of your running proxy.py server">
       <button class="check-btn" onclick="checkProxy()">
         <i class="ti ti-plug" aria-hidden="true"></i> Check proxy
@@ -188,6 +188,7 @@
 </div>
 
 <script>
+  document.getElementById('proxy-url').value = window.location.origin;
   let selectedNaics  = new Set();
   let currentItems   = [];
   let currentTotal   = 0;

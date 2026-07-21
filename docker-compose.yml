@@ -3,7 +3,7 @@ services:
     image: ${APP_IMAGE_NAME:-ai-agent-app:local}
     build:
       context: .
-      dockerfile: Dockerfile.compose
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
       - "5000:5000"
@@ -19,6 +19,10 @@ services:
       AWS_DEFAULT_REGION: "us-east-1"
       RAG_LLM_PROVIDER: "bedrock"
       RAG_LLM_MODEL: "deepseek.v3.2"
+
+      RAG_EMBEDDING_PROVIDER: "bedrock"
+      RAG_EMBEDDING_MODEL: "cohere.embed-english-v3"
+
       RAG_MAX_TOKENS: "1200"
       DEV_RELOAD: "1"
     volumes:

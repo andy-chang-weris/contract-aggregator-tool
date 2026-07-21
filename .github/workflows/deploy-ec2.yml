@@ -1,0 +1,89 @@
+name: Deploy to EC2
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-ec2-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Start application on EC2
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Validate deployment configuration
+        shell: bash
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+          EC2_DEPLOY_PATH: ${{ vars.EC2_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+
+          missing=()
+          [[ -n "$EC2_HOST" ]] || missing+=("EC2_HOST secret")
+          [[ -n "$EC2_USER" ]] || missing+=("EC2_USER secret")
+          [[ -n "$EC2_SSH_PRIVATE_KEY" ]] || missing+=("EC2_SSH_PRIVATE_KEY secret")
+          [[ -n "$EC2_KNOWN_HOSTS" ]] || missing+=("EC2_KNOWN_HOSTS secret")
+          [[ -n "$EC2_DEPLOY_PATH" ]] || missing+=("EC2_DEPLOY_PATH variable")
+
+          if (( ${#missing[@]} > 0 )); then
+            printf 'Missing GitHub configuration: %s\n' "${missing[*]}" >&2
+            exit 1
+          fi
+
+      - name: Configure SSH
+        shell: bash
+        env:
+          EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$EC2_SSH_PRIVATE_KEY" > "$HOME/.ssh/ec2_key"
+          printf '%s\n' "$EC2_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/ec2_key" "$HOME/.ssh/known_hosts"
+
+      - name: Start Docker Compose services
+        shell: bash
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_SSH_PORT: ${{ secrets.EC2_SSH_PORT }}
+          EC2_DEPLOY_PATH: ${{ vars.EC2_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          ssh_port="${EC2_SSH_PORT:-22}"
+          deploy_path_b64="$(printf '%s' "$EC2_DEPLOY_PATH" | base64 -w 0)"
+
+          ssh \
+            -i "$HOME/.ssh/ec2_key" \
+            -p "$ssh_port" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$EC2_USER@$EC2_HOST" \
+            "DEPLOY_PATH_B64='$deploy_path_b64' bash -s" <<'REMOTE'
+          set -euo pipefail
+
+          deploy_path="$(printf '%s' "$DEPLOY_PATH_B64" | base64 --decode)"
+          if [[ ! -f "$deploy_path/docker-compose.yml" && ! -f "$deploy_path/compose.yml" ]]; then
+            echo "No Compose file found in the configured deployment directory." >&2
+            exit 1
+          fi
+
+          cd "$deploy_path"
+          export USERPROFILE=${USERPROFILE:-$HOME}
+          docker compose up -d --build --remove-orphans
+          docker compose ps
+          REMOTE

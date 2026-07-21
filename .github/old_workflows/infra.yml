@@ -3,10 +3,12 @@ name: Infrastructure
 on:
   workflow_dispatch:
 
-  push:
-    paths:
-      - "terraform/**"
-      - ".github/workflows/infra.yml"
+  # Disabled while the legacy Terraform infrastructure is replaced with the
+  # EC2 and Elastic IP deployment.
+  # push:
+  #   paths:
+  #     - "terraform/**"
+  #     - ".github/workflows/infra.yml"
 
 permissions:
   id-token: write
@@ -18,6 +20,8 @@ env:
 
 jobs:
   terraform:
+    # Prevent manual dispatches from applying the legacy infrastructure too.
+    if: ${{ false }}
     runs-on: ubuntu-latest
 
     steps:

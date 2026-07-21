@@ -30,18 +30,22 @@ services:
     ports:
       - "8000:8000"
       - "5000:5000"
-      - "5055:5055"
+      - "5055:5055" 
+    env_file:
+      - ./agent/.env
     environment:
       FRONTEND_PORT: "8000"
       PROXY_PORT: "5000"
       CHAT_SERVER_HOST: "0.0.0.0"
       CHAT_SERVER_PORT: "5055"
-      DB_SECRET_NAME: "contract-aggregator/dev/database"
+      # DB_SECRET_NAME: "contract-aggregator/dev/database"
       AWS_DEFAULT_REGION: "us-east-1"
       RAG_LLM_PROVIDER: "ollama"
       RAG_LLM_MODEL: "qwen2.5:1.5b"
       RAG_LLM_BASE_URL: "http://ollama:11434"
+      DEV_RELOAD: "1"
     volumes:
+      - .:/app
       - ${USERPROFILE}/.aws:/root/.aws:ro
 
 volumes:

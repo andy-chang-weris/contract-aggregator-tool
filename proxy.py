@@ -22,6 +22,7 @@ from uuid import UUID
 from preference_training import train_client_preferences
 from relevance_ranking import rank_postings
 from ml_training import train_client_model
+import ml_scoring
 from pathlib import Path
 
 MODEL_DIR = Path(os.getenv("ML_MODEL_DIR", "./models"))
@@ -795,10 +796,6 @@ def ranked_opportunities(client_id):
             cursor.close(); conn.close()
             return jsonify({"error": "client_id does not exist"}), 404
 
-        # Load preferences (may be empty defaults)
-        cursor.execute("SELECT * FROM client_preferences WHERE client_id = %s", (client_id,))
-        prefs = dict(cursor.fetchone() or {})
-
         # Optionally exclude postings the client already rejected
         excluded_ids = set()
         if exclude_negative:
@@ -830,7 +827,30 @@ def ranked_opportunities(client_id):
     if excluded_ids:
         candidates = [c for c in candidates if c.get("id") not in excluded_ids]
 
-    ranked = rank_postings(candidates, prefs)
+    # ── ML-only ranking ──────────────────────────────────────────────────
+    # Hand-weighted scoring (relevance_ranking.py) is no longer used here.
+    # If no trained model exists yet for this client, this route now fails
+    # loudly rather than silently falling back, so it's obvious a model
+    # needs to be trained first via /api/clients/<id>/train-ml-model.
+    ml_bundle = ml_scoring.load_model_bundle(str(client_id), model_dir=MODEL_DIR)
+    if ml_bundle is None:
+        return jsonify({
+            "error": "no trained ML model exists for this client yet",
+            "hint": f"POST /api/clients/{client_id}/train-ml-model first",
+        }), 409
+
+    ranked = []
+    for posting in candidates:
+        prob = ml_scoring.score_posting_ml(posting, ml_bundle)
+        item = dict(posting)
+        item["relevance_score"] = round(prob * 100, 2) if prob is not None else None
+        item["ml_probability"] = prob
+        ranked.append(item)
+
+    # Postings the model failed to score (shouldn't normally happen) sink
+    # to the bottom instead of erroring the whole request.
+    ranked.sort(key=lambda item: (item["relevance_score"] is not None, item["relevance_score"]), reverse=True)
+
     total  = len(ranked)
     page   = ranked[offset: offset + limit]
 
@@ -841,6 +861,8 @@ def ranked_opportunities(client_id):
         "opportunities": page,
         "mode": "database",
         "ranked": True,
+        "ranking_method": "ml_model",
+        "model_trained_at": ml_bundle.get("trained_at"),
         "cached": False,
     })
 

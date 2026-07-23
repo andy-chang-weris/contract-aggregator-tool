@@ -23,7 +23,6 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 
@@ -391,6 +390,9 @@ def fetch_and_parse() -> list[dict]:
         if len(docs) < rows:
             break
 
-    print(f"\n  [eva] Done. {len(all_postings):,} kept "
-          f"({skipped_type:,} skipped by type, {skipped_agency:,} skipped by agency).")
+    print(f"\n  [eva] Type filter: {start:,} → {start - skipped_type:,} records.")
+    print(f"  [eva] Agency filter: {start - skipped_type:,} → {len(all_postings):,} records.")
+    print(f"  [eva] Done. {len(all_postings):,} records fetched.")
+    print(f"Virginia eVA: {len(all_postings):,} fetched")
+
     return all_postings

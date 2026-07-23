@@ -2,12 +2,10 @@
 """
 SAM.gov parser — allowed agencies + allowed types + allowed NAICS only.
 
-LOCAL MODE: reads from sam_opportunities.csv
-LIVE MODE:  calls SAM.gov API directly.
+Live API mode only — calls SAM.gov API directly.
 """
 
 import os
-import csv
 import json
 import time
 import requests
@@ -19,9 +17,7 @@ try:
 except ImportError:
     pass
 
-SAM_BASE_URL    = "https://api.sam.gov/opportunities/v2/search"
-LOCAL_CSV_FILE  = "sam_opportunities.csv"
-LOCAL_JSON_FILE = "sam_opportunities.json"
+SAM_BASE_URL = "https://api.sam.gov/opportunities/v2/search"
 
 # ── Allowed agencies ──────────────────────────────────────────────────────────
 # Only store contracts posted by one of these agencies (matched against the
@@ -57,7 +53,7 @@ SAM_ALLOWED_TYPES = {
     "solicitation",        # covers "Solicitation"
     "sources sought",      # covers "Sources Sought"
     "pre-solicitation",    # covers "Pre-solicitation"
-    "presolicitation",     # alternate spelling in CSV
+    "presolicitation",     # alternate spelling
 }
 
 def is_allowed_type_sam(award_status: str | None) -> bool:
@@ -124,42 +120,6 @@ def parse_date_str(s):
     return None
 
 
-# ── Normalize a CSV row → agreed schema ──────────────────────────────────────
-def normalize_csv_record(row):
-    _, type_label = normalize_type(row.get("Type", ""))
-
-    dept    = row.get("Department/Ind.Agency", "").strip()
-    subtier = row.get("Sub-Tier", "").strip()
-    office  = row.get("Office", "").strip()
-    agency  = ".".join(p for p in [dept, subtier, office] if p) or None
-
-    pop_state = row.get("PopState", "").strip()
-    off_state = row.get("State", "").strip()
-    place     = pop_state or off_state or None
-
-    return {
-        "source_site":          "SAM.gov",
-        "external_id":          row.get("NoticeId", "").strip(),
-        "title":                row.get("Title", "").strip(),
-        "agency":               agency,
-        "organization":         subtier or None,
-        "naics":                row.get("NaicsCode", "").strip() or None,
-        "description":          row.get("Description", "").strip() or None,
-        "posted_date":          parse_date_str(row.get("PostedDate")),
-        "deadline":             parse_date_str(row.get("ResponseDeadLine")),
-        "award_date":           parse_date_str(row.get("AwardDate")),
-        "contract_value":       row.get("Award$", "").strip() or None,
-        "award_status":         type_label,
-        "contract_type":        None,
-        "acq_strategy":         row.get("SetASide", "").strip() or None,
-        "place_of_performance": place,
-        "source_listing_id":    row.get("Sol#", "").strip() or None,
-        "url":                  row.get("Link", "").strip() or None,
-        "date_scraped":         datetime.now().strftime("%Y-%m-%d"),
-        "raw_response":         json.dumps(dict(row)),
-    }
-
-
 # ── Normalize a JSON record → schema ─────────────────────────────────────────
 def normalize_json_record(opp):
     _, type_label = normalize_type(opp.get("type") or opp.get("Type") or "")
@@ -199,80 +159,6 @@ def normalize_json_record(opp):
         "date_scraped":         datetime.now().strftime("%Y-%m-%d"),
         "raw_response":         json.dumps(opp),
     }
-
-
-# ── Local file loaders ────────────────────────────────────────────────────────
-def load_from_csv(filepath=LOCAL_CSV_FILE):
-    print(f"  [sam_gov] Loading CSV: {filepath}")
-    records = []
-    try:
-        with open(filepath, "r", encoding="latin-1") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                try:
-                    records.append(normalize_csv_record(row))
-                except Exception as e:
-                    print(f"  [sam_gov] Row error: {e}")
-                    continue
-        print(f"  [sam_gov] Loaded {len(records):,} records from CSV.")
-    except Exception as e:
-        print(f"  [sam_gov] Could not load CSV: {e}")
-        return []
-
-    # Agency filter
-    before = len(records)
-    records = [r for r in records if is_allowed_agency(r.get("agency"), r.get("organization"))]
-    print(f"  [sam_gov] Agency filter: {before:,} → {len(records):,} records.")
-
-    # Contract type filter
-    before = len(records)
-    records = [r for r in records if is_allowed_type_sam(r.get("award_status"))]
-    print(f"  [sam_gov] Type filter: {before:,} → {len(records):,} records.")
-
-    # NAICS filter
-    before = len(records)
-    records = [r for r in records if is_allowed_naics(r.get("naics"))]
-    print(f"  [sam_gov] NAICS filter: {before:,} → {len(records):,} records.")
-
-    return records
-
-
-def load_from_json(filepath=LOCAL_JSON_FILE):
-    print(f"  [sam_gov] Loading JSON: {filepath}")
-    records = []
-    try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            raw = json.load(f)
-        items = raw if isinstance(raw, list) else (
-            raw.get("opportunitiesData") or raw.get("opportunities") or []
-        )
-        for item in items:
-            try:
-                records.append(normalize_json_record(item))
-            except Exception as e:
-                print(f"  [sam_gov] Record error: {e}")
-                continue
-        print(f"  [sam_gov] Loaded {len(records):,} records from JSON.")
-    except Exception as e:
-        print(f"  [sam_gov] Could not load JSON: {e}")
-        return []
-
-    # Agency filter
-    before = len(records)
-    records = [r for r in records if is_allowed_agency(r.get("agency"), r.get("organization"))]
-    print(f"  [sam_gov] Agency filter: {before:,} → {len(records):,} records.")
-
-    # Contract type filter
-    before = len(records)
-    records = [r for r in records if is_allowed_type_sam(r.get("award_status"))]
-    print(f"  [sam_gov] Type filter: {before:,} → {len(records):,} records.")
-
-    # NAICS filter
-    before = len(records)
-    records = [r for r in records if is_allowed_naics(r.get("naics"))]
-    print(f"  [sam_gov] NAICS filter: {before:,} → {len(records):,} records.")
-
-    return records
 
 
 # ── Live API fetcher ──────────────────────────────────────────────────────────
@@ -324,19 +210,16 @@ def fetch_from_api(posted_from="01/01/2026", posted_to=None, limit=1000):
 
         offset += limit
         if offset >= total:
-            print(f"  [sam_gov] Done. {len(all_records):,} allowed-agency + allowed-type + allowed-NAICS records fetched.")
             break
 
         time.sleep(1)
+
+    print(f"  [sam_gov] Done. {len(all_records):,} records fetched.")
+    print(f"SAM.gov: {len(all_records):,} fetched")
 
     return all_records
 
 
 # ── Main entry point ──────────────────────────────────────────────────────────
 def fetch_and_parse():
-    if os.path.exists(LOCAL_CSV_FILE):
-        return load_from_csv(LOCAL_CSV_FILE)
-    elif os.path.exists(LOCAL_JSON_FILE):
-        return load_from_json(LOCAL_JSON_FILE)
-    else:
-        return fetch_from_api()
+    return fetch_from_api()

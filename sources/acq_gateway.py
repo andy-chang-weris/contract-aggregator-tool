@@ -139,6 +139,31 @@ def parse_listing(nid, entry):
     }
 
 
+def _normalize_listings(raw_listings):
+    """
+    The AG API's listing.data field is normally a dict keyed by node id
+    (nid -> entry). But on some pages/responses it comes back as a list
+    instead (observed e.g. when the API returns an empty result set as
+    [] rather than {}). Normalize both shapes into a dict so callers can
+    always safely use .items().
+    """
+    if isinstance(raw_listings, list):
+        # Try to key by each entry's own nid if present, else fall back
+        # to positional index so nothing is silently dropped.
+        normalized = {}
+        for i, entry in enumerate(raw_listings):
+            if isinstance(entry, dict):
+                nid = entry.get("values", {}).get("nid") or entry.get("nid") or str(i)
+            else:
+                nid = str(i)
+            normalized[str(nid)] = entry
+        return normalized
+    if isinstance(raw_listings, dict):
+        return raw_listings
+    # Unexpected type (None, str, etc.) — treat as no listings.
+    return {}
+
+
 def fetch_page(page_number):
     response = requests.get(
         BASE_URL,
@@ -149,7 +174,9 @@ def fetch_page(page_number):
         print(f"Non-200 on page {page_number}: {response.status_code}")
         return None, None
     data = response.json()
-    return data, data.get("listing", {}).get("data", {})
+    raw_listings = data.get("listing", {}).get("data", {})
+    listings = _normalize_listings(raw_listings)
+    return data, listings
 
 
 def fetch_and_parse():
@@ -204,5 +231,8 @@ def fetch_and_parse():
     before = len(all_postings)
     all_postings = [p for p in all_postings if is_allowed_naics(p.get("naics"))]
     print(f"  [acq_gateway] NAICS filter: {before:,} → {len(all_postings):,} records.")
+
+    print(f"  [acq_gateway] Done. {len(all_postings):,} records fetched.")
+    print(f"Acquisition Gateway: {len(all_postings):,} fetched")
 
     return all_postings

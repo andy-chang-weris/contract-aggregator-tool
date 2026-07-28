@@ -1,0 +1,2 @@
+8 17 * * * docker exec contract-aggregator-tool-app-1 python3 /app/run_all.py
+# 15 16 * * * docker exec contract-aggregator-tool-app-1 python3 /app/run_all.py > /var/log/cron_test.log 2>&1

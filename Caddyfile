@@ -1,0 +1,5 @@
+contract-aggregator.duckdns.org {
+    reverse_proxy /mcp mcp:3000
+
+    reverse_proxy app:8000
+}

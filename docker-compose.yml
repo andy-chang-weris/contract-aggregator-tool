@@ -28,3 +28,41 @@ services:
     volumes:
       - .:/app
       - ${USERPROFILE}/.aws:/root/.aws:ro
+  mcp:
+    build: ./contract-mcp-server
+    ports: 
+      - "3000:3000"
+    environment:
+      BACKEND_URL: http://app:8000
+      PORT: "3000"
+    depends_on:
+      - app
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+
+# The Docker Compose Cron Sidecar
+  cron-scheduler:
+    image: docker:cli  # Use the official lightweight Docker CLI image instead of plain alpine
+    container_name: cron-scheduler
+    command: crond -f -l 2 -L /dev/stdout
+    environment:
+      - TZ=America/New_York
+    volumes:
+      - ./crontab:/etc/crontabs/root
+      - /var/run/docker.sock:/var/run/docker.sock  # Allows container to talk to host Docker
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

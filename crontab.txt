@@ -1,0 +1,2 @@
+# Run every day at midnight (0 0 * * *)
+0 0 * * * docker exec app python3 /app/run_all.py

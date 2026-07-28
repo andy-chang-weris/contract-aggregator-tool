@@ -1,0 +1,53 @@
+name: Run Python Script on EC2 via Cron
+
+on:
+  # 1. Schedule the cron job (UTC time)
+  # This example runs every day at midnight (0 0 * * *)
+  schedule:
+    - cron: '0 0 * * *'
+  
+  # 2. Allows you to also trigger it manually from the GitHub Actions tab if needed
+  workflow_dispatch:
+
+jobs:
+  run-remote-script:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up SSH Private Key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.EC2_HOST }}
+          SSH_USER: ${{ secrets.EC2_USER }}
+        run: |
+          # Create the .ssh directory and write the private key
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          
+          # Automatically accept the EC2 server host key
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: SSH into EC2 and run python script
+        env:
+          SSH_HOST: ${{ secrets.EC2_HOST }}
+          SSH_USER: ${{ secrets.EC2_USER }}
+        run: |
+          ssh "$SSH_USER@$SSH_HOST" << 'EOF'
+            # Commands executed inside your EC2 instance go here
+            echo "Successfully connected to EC2!"
+            
+            # Navigate to your project directory (change this path to where your script lives)
+            cd /home/ubuntu/my_project_directory
+            
+            # (Optional) Pull latest code changes if your python script is tracked in git
+            # git pull origin main
+            
+            # Run your python script (ensure you point to your correct python/venv path if needed)
+            python3 run_all.py
+            
+            echo "run_all.py execution finished."
+          EOF

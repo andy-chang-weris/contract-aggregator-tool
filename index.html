@@ -672,7 +672,6 @@
     if (ptype)                   params.set('contractType', ptype);
     if (org)                     params.set('agency', org);
     if (selectedNaics.size > 0)  params.set('naics', [...selectedNaics].join(','));
-    params.set('split', 'validation');
 
     let endpoint = `${base}/api/opportunities`;
     if (sortField === 'relevance') {

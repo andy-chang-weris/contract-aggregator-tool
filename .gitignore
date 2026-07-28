@@ -32,4 +32,5 @@ terraform/*.tfstate.backup
 
 # Test files
 test.py
+run_sam_only.py
 client_feedback_rows.json

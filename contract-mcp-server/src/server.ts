@@ -5,16 +5,13 @@
  * intentionally NOT implemented here. ChatGPT's existing Outlook connector
  * handles drafting/sending after this MCP server returns contract data.
  *
- * Source-of-truth check performed before writing this file, and
- * re-verified against project knowledge this turn:
- *   - GET  /api/opportunities  confirmed in proxy.py, used by search_contracts
- *   - POST /api/feedback       confirmed in proxy.py, used by mark_feedback
- *   - GET  /api/opportunities/<id>  still NOT found anywhere in project
- *     knowledge. get_contract_details below calls this URL, but the route
- *     does not exist yet in proxy.py and will 404 until you add it.
- *
- * I cannot confirm the /api/opportunities/<id> route exists. Treat that
- * tool as unverified until the backend route is added and tested.
+ * Backend routes used, all confirmed present in proxy.py:
+ *   GET   /api/opportunities                        search_contracts
+ *   GET   /api/opportunities/<int:id>               get_contract_details
+ *   GET   /api/clients/<uuid>/ranked-opportunities  search_contracts (relevance)
+ *   PATCH /api/opportunities/<int:id>/summary       save_contract_summary
+ *   PATCH /api/opportunities/summaries              save_contract_summaries
+ *   POST  /api/feedback                             mark_feedback
  */
 
 import express from "express";
@@ -35,7 +32,7 @@ const DEFAULT_CLIENT_ID =
 
 // New: shared secret sent on write requests to proxy.py's protected /api/*
 // write routes. Must match API_SHARED_SECRET set on the Flask app's env.
-// service. Read-only requests (search_contracts, get_contract_details) do
+// Read-only requests (search_contracts, get_contract_details) do
 // not send this, since GET routes are intentionally left unprotected.
 const API_SHARED_SECRET = process.env.API_SHARED_SECRET || "";
 
@@ -130,9 +127,7 @@ server.registerTool(
 );
 
 // ── get_contract_details ────────────────────────────────────────────────
-// NOT VERIFIED: GET /api/opportunities/<id> does not exist in proxy.py as
-// of the last project knowledge search. This will return a 404 until that
-// route is added.
+// Retrieve full details for a single contract posting by its numeric id (postings.id).
 server.registerTool(
   "get_contract_details",
   {
@@ -173,11 +168,11 @@ server.registerTool(
 );
 
 // ── save_contract_summary ───────────────────────────────────────────────
-// NOT VERIFIED: PATCH /api/opportunities/<id>/summary does not exist yet in
-// proxy.py as of this project knowledge search. This tool calls that URL,
-// but the route must be added to proxy.py (and the ai_summary column added
-// via db.py's columns_to_ensure) before this will work. It will 404 until
-// then.
+// Save an AI-generated plain-language summary for a contract posting, to be 
+// displayed in place of the raw description in the web UI. Write the summary 
+// yourself based on the posting's title, description, and any other details 
+// you have, then call this tool to persist it. For more than one contract, 
+// use save_contract_summaries instead.
 server.registerTool(
   "save_contract_summary",
   {

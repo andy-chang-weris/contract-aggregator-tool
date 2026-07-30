@@ -19,11 +19,8 @@ from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from uuid import UUID
-from preference_training import train_client_preferences
-from relevance_ranking import rank_postings
 from ml_training import train_client_model
 import ml_scoring
-from pathlib import Path
 
 MODEL_DIR = Path(os.getenv("ML_MODEL_DIR", "./models"))
 
@@ -704,58 +701,6 @@ def client_preferences(client_id):
             conn.rollback()
         except Exception:
             pass
-        return jsonify({"error": "Internal server error"}), 500
-
-
-@app.route("/api/clients/<client_id>/train-preferences", methods=["POST"])
-@limiter.limit("20 per minute")
-def train_preferences_endpoint(client_id):
-    try:
-        client_id = parse_uuid(client_id, "client_id")
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-
-    data = request.get_json(silent=True) or {}
-
-    try:
-        min_feedback_events = parse_int(
-            data.get("min_feedback_events", 1),
-            "min_feedback_events"
-        )
-        positive_threshold = float(data.get("positive_threshold", 1.0))
-        negative_threshold = float(data.get("negative_threshold", -2.0))
-        max_profile_items = parse_int(
-            data.get("max_profile_items", 25),
-            "max_profile_items"
-        )
-        include_clicks = parse_bool(data.get("include_clicks"), default=True)
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-
-    if min_feedback_events < 1:
-        return jsonify({"error": "min_feedback_events must be at least 1"}), 400
-    if max_profile_items < 1 or max_profile_items > 100:
-        return jsonify({"error": "max_profile_items must be between 1 and 100"}), 400
-    if positive_threshold <= 0:
-        return jsonify({"error": "positive_threshold must be greater than 0"}), 400
-    if negative_threshold >= 0:
-        return jsonify({"error": "negative_threshold must be less than 0"}), 400
-
-    try:
-        result = train_client_preferences(
-            get_db,
-            client_id,
-            min_feedback_events=min_feedback_events,
-            include_clicks=include_clicks,
-            positive_threshold=positive_threshold,
-            negative_threshold=negative_threshold,
-            max_profile_items=max_profile_items,
-        )
-        status_code = 200 if result.get("status") != "error" else 404
-        return jsonify(result), status_code
-
-    except Exception as e:
-        logger.error("Training error in %s: %s", request.path, e)
         return jsonify({"error": "Internal server error"}), 500
 
 @app.route("/api/clients/<client_id>/ranked-opportunities")

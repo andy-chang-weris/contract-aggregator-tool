@@ -196,7 +196,6 @@
   let sortField      = 'posted_date';
   let sortDir        = 'desc';
   const PAGE_SIZE    = 20;
-  const AUTO_TRAIN_AFTER_FEEDBACK = true;
 
   let feedbackState = {}; // { postingId: 'like' | 'dislike' } — this client's existing feedback
 
@@ -467,24 +466,6 @@
     }
   }
 
-  function trainPreferencesInBackground() {
-    if (!AUTO_TRAIN_AFTER_FEEDBACK || !CLIENT_ID) return;
-
-    const base = document.getElementById('proxy-url').value.trim();
-    fetch(`${base}/api/clients/${CLIENT_ID}/train-preferences`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        min_feedback_events: 1,
-        include_clicks: true,
-        positive_threshold: 1.0,
-        negative_threshold: -2.0
-      })
-    }).catch(err => {
-      console.warn('Preference training failed:', err);
-    });
-  }
-
   /* ── Feedback state (persisted server-side, fetched on load) ─ */
   // NEW: calls GET /api/clients/<client_id>/feedback, a route added to
   // proxy.py alongside this change. Populates feedbackState so renderCard
@@ -548,7 +529,6 @@
         throw new Error(data.error || `HTTP ${res.status}`);
       }
 
-      trainPreferencesInBackground();
       feedbackState[Number(postingId)] = action;
 
       if (button) {
@@ -633,7 +613,6 @@
                </a>`
             : ''}
         </div>
-        ${renderRelevanceReasons(c)}
         ${renderDescription(c)}
         ${renderAiSummary(c)}
         <div class="feedback-row">

@@ -83,7 +83,6 @@ jobs:
           fi
 
           cd "$deploy_path"
-          export USERPROFILE=${USERPROFILE:-$HOME}
           docker compose up -d --build --remove-orphans
           docker compose ps
           REMOTE

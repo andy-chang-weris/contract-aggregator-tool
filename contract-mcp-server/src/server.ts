@@ -25,7 +25,7 @@ import { z } from "zod";
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:5000";
 const PORT = process.env.PORT || 3000;
 
-// Confirmed against agent/interactive-ui/index.html's DEFAULT_CLIENT_ID, and
+// Confirmed against index.html's DEFAULT_CLIENT_ID, and
 // verified as a real working row in the production clients table by a
 // successful POST /api/feedback test earlier in this project (returned
 // feedback.id: 37, status: ok). Overridable via env var if you ever need a

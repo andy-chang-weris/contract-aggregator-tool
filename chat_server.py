@@ -1,11 +1,3 @@
-"""Isolated local chat API for the interactive UI prototype.
-
-Run from the agent directory:
-    python interactive-ui/chat_server.py
-
-This intentionally does not modify or import the parent dashboard proxy.py.
-"""
-
 from __future__ import annotations
 
 import os

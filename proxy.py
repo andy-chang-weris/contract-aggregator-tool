@@ -56,18 +56,19 @@ limiter = Limiter(
 API_SHARED_SECRET = os.getenv("API_SHARED_SECRET")
 WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
+PUBLIC_WRITE_ROUTES = {"/api/feedback"}
+
 @app.before_request
 def require_api_key_for_writes():
     if request.method not in WRITE_METHODS:
         return None
     if not request.path.startswith("/api/"):
         return None
-    if not API_SHARED_SECRET:
-        # Fails open with a warning if the env var isn't set, so you don't
-        # accidentally lock yourself out before configuring it. Flip this
-        # to fail closed once you've confirmed the key is set on Railway.
-        print("  [security] WARNING: API_SHARED_SECRET not set; write routes are unprotected.")
+    if request.path in PUBLIC_WRITE_ROUTES:
         return None
+    if not API_SHARED_SECRET:
+        logger.error("API_SHARED_SECRET not set; refusing write route %s", request.path)
+        return jsonify({"error": "Server misconfigured"}), 503
     provided = request.headers.get("X-API-Key")
     if provided != API_SHARED_SECRET:
         return jsonify({"error": "Unauthorized"}), 401

@@ -350,9 +350,7 @@ app.use(express.json());
 
 // Stateless mode: a new McpServer + transport per request, per the pattern
 // shown in the MCP TypeScript SDK's StreamableHTTPServerTransport docs
-// (sessionIdGenerator: undefined = stateless). I could not find this exact
-// snippet in project knowledge since your repo has no MCP code; this is
-// standard SDK usage, not repo-sourced.
+// (sessionIdGenerator: undefined = stateless).
 app.post("/mcp", async (req, res) => {
   try {
     const server = buildServer();

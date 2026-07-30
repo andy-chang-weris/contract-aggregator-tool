@@ -466,7 +466,6 @@ RDS backups or snapshots
 RDS encryption
 Remote Terraform state backend
 SAM_API_KEY storage
-API_SHARED_SECRET for write routes
 ```
 
-`proxy.py` supports `API_SHARED_SECRET` for protecting write routes, but the ECS task definition does not currently set it. Without that variable, write routes fail open with a warning in application logs.
+`proxy.py` requires `API_SHARED_SECRET` for all /api/* write routes except /api/feedback, which is left key-free and protected only by rate limiting so the public dashboard can submit feedback directly. As of 7/30/2026, API_SHARED_SECRET is set on both the app and mcp services; missing the variable now returns 503 rather than failing open.

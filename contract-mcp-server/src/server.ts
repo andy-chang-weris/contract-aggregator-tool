@@ -34,7 +34,7 @@ const DEFAULT_CLIENT_ID =
   process.env.DEFAULT_CLIENT_ID || "9f68f2aa-fc61-496f-81ed-b89ee5a92cdf";
 
 // New: shared secret sent on write requests to proxy.py's protected /api/*
-// write routes. Must match API_SHARED_SECRET set on the Flask Railway
+// write routes. Must match API_SHARED_SECRET set on the Flask app's env.
 // service. Read-only requests (search_contracts, get_contract_details) do
 // not send this, since GET routes are intentionally left unprotected.
 const API_SHARED_SECRET = process.env.API_SHARED_SECRET || "";

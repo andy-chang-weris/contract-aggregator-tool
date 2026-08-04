@@ -53,7 +53,7 @@ limiter = Limiter(
 API_SHARED_SECRET = os.getenv("API_SHARED_SECRET")
 WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
-PUBLIC_WRITE_ROUTES = {"/api/feedback"}
+PUBLIC_WRITE_ROUTES = {"/api/feedback", "/api/chat"}
 
 @app.before_request
 def require_api_key_for_writes():
